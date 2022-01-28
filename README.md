@@ -8,6 +8,7 @@ Paper link: tba
 All model files and the meta-dataset can be downlaoded here: https://www.dropbox.com/sh/1yvk1034zkw4o0d/AAA8Kq5tTgrjK-ro4wCTWVNga?dl=0
 
 # Installation
-
+tbd
 
 # Documentation
+tbd
