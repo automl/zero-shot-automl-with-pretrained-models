@@ -1,0 +1,9 @@
+Cython
+numpy
+scipy
+scikit-learn>=0.20.0
+pandas
+xgboost
+ConfigSpace
+git+https://github.com/mlindauer/ASlibScenario
+

@@ -1,0 +1,356 @@
+algorithm_cutoff_memory: '?'
+algorithm_cutoff_time: 600
+default_steps:
+- Static
+- Dynamic-1
+- Dynamic-2
+- Dynamic-3
+- Dynamic-4
+feature_steps:
+  Dynamic-1:
+    provides:
+    - Choices-1
+    - Conflicts/Choices-1
+    - Avg_Conflict_Levels-1
+    - Avg_LBD_Levels-1
+    - Learnt_from_Conflict-1
+    - Learnt_from_Loop-1
+    - Frac_Learnt_from_Conflict-1
+    - Frac_Learnt_from_Loop-1
+    - Literals_in_Conflict_Nogoods-1
+    - Literals_in_Loop_Nogoods-1
+    - Frac_Literals_in_Conflict_Nogoods-1
+    - Frac_Literals_in_Loop_Nogoods-1
+    - Removed_Nogoods-1
+    - Learnt_Binary-1
+    - Learnt_Ternary-1
+    - Learnt_Others-1
+    - Frac_Removed_Nogood-1
+    - Frac_Learnt_Binary-1
+    - Frac_Learnt_Ternary-1
+    - Frac_Learnt_Others-1
+    - Skipped_Levels_while_Backjumping-1
+    - Avg_Skipped_Levels_while_Backjumping-1
+    - Longest_Backjumping-1
+    - Running_Avg_Conflictlevel-1
+    - Running_Avg_LBD-1
+    requires:
+    - Static
+  Dynamic-2:
+    provides:
+    - Choices-2
+    - Conflicts/Choices-2
+    - Avg_Conflict_Levels-2
+    - Avg_LBD_Levels-2
+    - Learnt_from_Conflict-2
+    - Learnt_from_Loop-2
+    - Frac_Learnt_from_Conflict-2
+    - Frac_Learnt_from_Loop-2
+    - Literals_in_Conflict_Nogoods-2
+    - Literals_in_Loop_Nogoods-2
+    - Frac_Literals_in_Conflict_Nogoods-2
+    - Frac_Literals_in_Loop_Nogoods-2
+    - Removed_Nogoods-2
+    - Learnt_Binary-2
+    - Learnt_Ternary-2
+    - Learnt_Others-2
+    - Frac_Removed_Nogood-2
+    - Frac_Learnt_Binary-2
+    - Frac_Learnt_Ternary-2
+    - Frac_Learnt_Others-2
+    - Skipped_Levels_while_Backjumping-2
+    - Avg_Skipped_Levels_while_Backjumping-2
+    - Longest_Backjumping-2
+    - Running_Avg_Conflictlevel-2
+    - Running_Avg_LBD-2
+    requires:
+    - Static
+    - Dynamic-1
+  Dynamic-3:
+    provides:
+    - Choices-3
+    - Conflicts/Choices-3
+    - Avg_Conflict_Levels-3
+    - Avg_LBD_Levels-3
+    - Learnt_from_Conflict-3
+    - Learnt_from_Loop-3
+    - Frac_Learnt_from_Conflict-3
+    - Frac_Learnt_from_Loop-3
+    - Literals_in_Conflict_Nogoods-3
+    - Literals_in_Loop_Nogoods-3
+    - Frac_Literals_in_Conflict_Nogoods-3
+    - Frac_Literals_in_Loop_Nogoods-3
+    - Removed_Nogoods-3
+    - Learnt_Binary-3
+    - Learnt_Ternary-3
+    - Learnt_Others-3
+    - Frac_Removed_Nogood-3
+    - Frac_Learnt_Binary-3
+    - Frac_Learnt_Ternary-3
+    - Frac_Learnt_Others-3
+    - Skipped_Levels_while_Backjumping-3
+    - Avg_Skipped_Levels_while_Backjumping-3
+    - Longest_Backjumping-3
+    - Running_Avg_Conflictlevel-3
+    - Running_Avg_LBD-3
+    - Choices-4
+    requires:
+    - Static
+    - Dynamic-1
+    - Dynamic-2
+  Dynamic-4:
+    provides:
+    - Choices-4
+    - Conflicts/Choices-4
+    - Avg_Conflict_Levels-4
+    - Avg_LBD_Levels-4
+    - Learnt_from_Conflict-4
+    - Learnt_from_Loop-4
+    - Frac_Learnt_from_Conflict-4
+    - Frac_Learnt_from_Loop-4
+    - Literals_in_Conflict_Nogoods-4
+    - Literals_in_Loop_Nogoods-4
+    - Frac_Literals_in_Conflict_Nogoods-4
+    - Frac_Literals_in_Loop_Nogoods-4
+    - Removed_Nogoods-4
+    - Learnt_Binary-4
+    - Learnt_Ternary-4
+    - Learnt_Others-4
+    - Frac_Removed_Nogood-4
+    - Frac_Learnt_Binary-4
+    - Frac_Learnt_Ternary-4
+    - Frac_Learnt_Others-4
+    - Skipped_Levels_while_Backjumping-4
+    - Avg_Skipped_Levels_while_Backjumping-4
+    - Longest_Backjumping-4
+    - Running_Avg_Conflictlevel-4
+    - Running_Avg_LBD-4
+    requires:
+    - Static
+    - Dynamic-1
+    - Dynamic-2
+    - Dynamic-3
+  Static:
+    provides:
+    - Frac_Neg_Body
+    - Frac_Pos_Body
+    - Frac_Unary_Rules
+    - Frac_Binary_Rules
+    - Frac_Ternary_Rules
+    - Frac_Integrity_Rules
+    - Tight
+    - Problem_Variables
+    - Free_Problem_Variables
+    - Assigned_Problem_Variables
+    - Constraints
+    - Constraints/Vars
+    - Created_Bodies
+    - Program_Atoms
+    - SCCS
+    - Nodes_in_Positive_BADG
+    - Rules
+    - Normal_Rules
+    - Cardinality_Rules
+    - Choice_Rules
+    - Weight_Rules
+    - Frac_Normal_Rules
+    - Frac_Cardinality_Rules
+    - Frac_Choice_Rules
+    - Frac_Weight_Rules
+    - Equivalences
+    - Atom-Atom_Equivalences
+    - Body-Body_Equivalences
+    - Other_Equivalences
+    - Frac_Atom-Atom_Equivalences
+    - Frac_Body-Body_Equivalences
+    - Frac_Other_Equivalences
+    - Binary_Constraints
+    - Ternary_Constraints
+    - Other_Constraints
+    - Frac_Binary_Constraints
+    - Frac_Ternary_Constraints
+    - Frac_Other_Constraints
+features_cutoff_memory: '?'
+features_cutoff_time: 600
+features_deterministic:
+- Frac_Neg_Body
+- Frac_Pos_Body
+- Frac_Unary_Rules
+- Frac_Binary_Rules
+- Frac_Ternary_Rules
+- Frac_Integrity_Rules
+- Tight
+- Problem_Variables
+- Free_Problem_Variables
+- Assigned_Problem_Variables
+- Constraints
+- Constraints/Vars
+- Created_Bodies
+- Program_Atoms
+- SCCS
+- Nodes_in_Positive_BADG
+- Rules
+- Normal_Rules
+- Cardinality_Rules
+- Choice_Rules
+- Weight_Rules
+- Frac_Normal_Rules
+- Frac_Cardinality_Rules
+- Frac_Choice_Rules
+- Frac_Weight_Rules
+- Equivalences
+- Atom-Atom_Equivalences
+- Body-Body_Equivalences
+- Other_Equivalences
+- Frac_Atom-Atom_Equivalences
+- Frac_Body-Body_Equivalences
+- Frac_Other_Equivalences
+- Binary_Constraints
+- Ternary_Constraints
+- Other_Constraints
+- Frac_Binary_Constraints
+- Frac_Ternary_Constraints
+- Frac_Other_Constraints
+- Choices-1
+- Conflicts/Choices-1
+- Avg_Conflict_Levels-1
+- Avg_LBD_Levels-1
+- Learnt_from_Conflict-1
+- Learnt_from_Loop-1
+- Frac_Learnt_from_Conflict-1
+- Frac_Learnt_from_Loop-1
+- Literals_in_Conflict_Nogoods-1
+- Literals_in_Loop_Nogoods-1
+- Frac_Literals_in_Conflict_Nogoods-1
+- Frac_Literals_in_Loop_Nogoods-1
+- Removed_Nogoods-1
+- Learnt_Binary-1
+- Learnt_Ternary-1
+- Learnt_Others-1
+- Frac_Removed_Nogood-1
+- Frac_Learnt_Binary-1
+- Frac_Learnt_Ternary-1
+- Frac_Learnt_Others-1
+- Skipped_Levels_while_Backjumping-1
+- Avg_Skipped_Levels_while_Backjumping-1
+- Longest_Backjumping-1
+- Running_Avg_Conflictlevel-1
+- Running_Avg_LBD-1
+- Choices-2
+- Conflicts/Choices-2
+- Avg_Conflict_Levels-2
+- Avg_LBD_Levels-2
+- Learnt_from_Conflict-2
+- Learnt_from_Loop-2
+- Frac_Learnt_from_Conflict-2
+- Frac_Learnt_from_Loop-2
+- Literals_in_Conflict_Nogoods-2
+- Literals_in_Loop_Nogoods-2
+- Frac_Literals_in_Conflict_Nogoods-2
+- Frac_Literals_in_Loop_Nogoods-2
+- Removed_Nogoods-2
+- Learnt_Binary-2
+- Learnt_Ternary-2
+- Learnt_Others-2
+- Frac_Removed_Nogood-2
+- Frac_Learnt_Binary-2
+- Frac_Learnt_Ternary-2
+- Frac_Learnt_Others-2
+- Skipped_Levels_while_Backjumping-2
+- Avg_Skipped_Levels_while_Backjumping-2
+- Longest_Backjumping-2
+- Running_Avg_Conflictlevel-2
+- Running_Avg_LBD-2
+- Choices-3
+- Conflicts/Choices-3
+- Avg_Conflict_Levels-3
+- Avg_LBD_Levels-3
+- Learnt_from_Conflict-3
+- Learnt_from_Loop-3
+- Frac_Learnt_from_Conflict-3
+- Frac_Learnt_from_Loop-3
+- Literals_in_Conflict_Nogoods-3
+- Literals_in_Loop_Nogoods-3
+- Frac_Literals_in_Conflict_Nogoods-3
+- Frac_Literals_in_Loop_Nogoods-3
+- Removed_Nogoods-3
+- Learnt_Binary-3
+- Learnt_Ternary-3
+- Learnt_Others-3
+- Frac_Removed_Nogood-3
+- Frac_Learnt_Binary-3
+- Frac_Learnt_Ternary-3
+- Frac_Learnt_Others-3
+- Skipped_Levels_while_Backjumping-3
+- Avg_Skipped_Levels_while_Backjumping-3
+- Longest_Backjumping-3
+- Running_Avg_Conflictlevel-3
+- Running_Avg_LBD-3
+- Choices-4
+- Conflicts/Choices-4
+- Avg_Conflict_Levels-4
+- Avg_LBD_Levels-4
+- Learnt_from_Conflict-4
+- Learnt_from_Loop-4
+- Frac_Learnt_from_Conflict-4
+- Frac_Learnt_from_Loop-4
+- Literals_in_Conflict_Nogoods-4
+- Literals_in_Loop_Nogoods-4
+- Frac_Literals_in_Conflict_Nogoods-4
+- Frac_Literals_in_Loop_Nogoods-4
+- Removed_Nogoods-4
+- Learnt_Binary-4
+- Learnt_Ternary-4
+- Learnt_Others-4
+- Frac_Removed_Nogood-4
+- Frac_Learnt_Binary-4
+- Frac_Learnt_Ternary-4
+- Frac_Learnt_Others-4
+- Skipped_Levels_while_Backjumping-4
+- Avg_Skipped_Levels_while_Backjumping-4
+- Longest_Backjumping-4
+- Running_Avg_Conflictlevel-4
+- Running_Avg_LBD-4
+features_stochastic: null
+maximize:
+- false
+metainfo_algorithms:
+  clasp/2.1.3/h1-n1:
+    configuration: ''
+    deterministic: true
+  clasp/2.1.3/h10-n1:
+    configuration: ''
+    deterministic: true
+  clasp/2.1.3/h11-n1:
+    configuration: ''
+    deterministic: true
+  clasp/2.1.3/h2-n1:
+    configuration: ''
+    deterministic: true
+  clasp/2.1.3/h3-n1:
+    configuration: ''
+    deterministic: true
+  clasp/2.1.3/h4-n1:
+    configuration: ''
+    deterministic: true
+  clasp/2.1.3/h5-n1:
+    configuration: ''
+    deterministic: true
+  clasp/2.1.3/h6-n1:
+    configuration: ''
+    deterministic: true
+  clasp/2.1.3/h7-n1:
+    configuration: ''
+    deterministic: true
+  clasp/2.1.3/h8-n1:
+    configuration: ''
+    deterministic: true
+  clasp/2.1.3/h9-n1:
+    configuration: ''
+    deterministic: true
+number_of_feature_steps: 5
+performance_measures:
+- runtime
+performance_type:
+- runtime
+scenario_id: ASP-POTASSCO
