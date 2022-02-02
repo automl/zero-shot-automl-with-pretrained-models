@@ -5,7 +5,9 @@ Given a new dataset D and a low compute budget, how should we choose a pre-train
 Paper link: tba
 
 # Download Models and Meta-Dataset
-All model files and the meta-dataset can be downlaoded here: https://www.dropbox.com/sh/1yvk1034zkw4o0d/AAA8Kq5tTgrjK-ro4wCTWVNga?dl=0
+Our data can be downloaded under the following links:
+* Meta-Dataset: https://ml.informatik.uni-freiburg.de/research-artifacts/zero-shot-automl-with-pretrained-models/datasets.tar
+* Models: https://ml.informatik.uni-freiburg.de/research-artifacts/zero-shot-automl-with-pretrained-models/models.tar
 
 # Installation
 tbd
