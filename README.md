@@ -6,8 +6,8 @@ Paper link: tba
 
 # Download Models and Meta-Dataset
 Our data can be downloaded under the following links:
-* Meta-Dataset: https://ml.informatik.uni-freiburg.de/research-artifacts/zero-shot-automl-with-pretrained-models/datasets.tar
-* Models: https://ml.informatik.uni-freiburg.de/research-artifacts/zero-shot-automl-with-pretrained-models/models.tar
+* Meta-Dataset: https://ml.informatik.uni-freiburg.de/research-artifacts/zero-shot-automl-with-pretrained-models/datasets.tar.gz
+* Models: https://ml.informatik.uni-freiburg.de/research-artifacts/zero-shot-automl-with-pretrained-models/models.tar.gz
 
 # Installation
 tbd
