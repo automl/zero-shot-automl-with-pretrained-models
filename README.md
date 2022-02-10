@@ -14,9 +14,9 @@ Our data can be downloaded under the following links:
 
 Create and activate a Python 3.7 environment and run
 
-'''
+```
 pip install -r requirements.txt
-'''
+```
 
 # Documentation
 
