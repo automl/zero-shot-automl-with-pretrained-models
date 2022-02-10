@@ -150,15 +150,15 @@ if __name__ == '__main__':
         help="random seed")
 
     parser.add_argument(
-        "--output_path", 
-        default="../../../data/meta_dataset", 
+        "--output_savedir", 
+        default="../../data/meta_dataset", 
         type=Path, 
         help=" "
     )
 
     parser.add_argument(
         "--dataset_dir",
-        default="../../../data/datasets",
+        default="../../data/datasets",
         type=Path,
         help=" "
     )
@@ -178,7 +178,7 @@ if __name__ == '__main__':
     precompute_meta_features(
         args.dataset_dir,
         args.n_augmentations,
-        args.output_path, 
+        args.output_savedir, 
         dump_dataframe_csv=True
     )
 	

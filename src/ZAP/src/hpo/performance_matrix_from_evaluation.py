@@ -31,30 +31,16 @@ def get_scores_dataset_x_configs(dataset_eval_dir, n_augmentations, metric = "al
             config_scores = []
             for n, config_path in enumerate(config_path_sublist):
                 score_path = config_path / "score" / "scores.txt"
-                try:
-                    if metric == "alc":
-                        # get alc
-                        score = float(score_path.read_text().split(" ")[1].split("\n")[0])
-                        config_scores.append(score)
-                    elif metric == "acc":
-                        # get accuracy
-                        score_info = score_path.read_text().split("\n")
-                        score = score_info[4].split(": ")[-1][1:-1].split(", ")[-1]
-                        config_scores.append(float(score))
-
-                except:
-                    # Report and record if there is something wrong with the evaluation
-                    config_file = config_names[i].split('-')[-1]+'.yaml'
-                    config_name_tryout = config_names[i].split('-')[-1]+'_'+str(n)
-                    
-                    model_config_name = os.path.join('kakaobrain_optimized_per_icgen_augmentation', augmentation_dir.name, config_file)
-                    dataset_dir = os.path.join('../../../data/datasets/', augmentation_dir.parent.parent.name, augmentation_dir.parent.name)
-                    experiment_name = os.path.join(augmentation_dir.parent.parent.name, augmentation_dir.parent.name, augmentation_dir.name, config_name_tryout)
-                    
-                    failed_job_args = ' '.join(['--model_config_name', model_config_name, '--dataset_dir', dataset_dir, '--experiment_name', experiment_name])
-                    failed_jobs.append(failed_job_args)
-
-                    print("following config has an issue: {}".format(experiment_name))
+  
+                if metric == "alc":
+                    # get alc
+                    score = float(score_path.read_text().split(" ")[1].split("\n")[0])
+                    config_scores.append(score)
+                elif metric == "acc":
+                    # get accuracy
+                    score_info = score_path.read_text().split("\n")
+                    score = score_info[4].split(": ")[-1][1:-1].split(", ")[-1]
+                    config_scores.append(float(score))
 
             if not config_scores:
                 avg_config_scores.append(0.0)
@@ -157,7 +143,7 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--experiment_group", required=True, type=Path, help="Evaluation results dir")
-    parser.add_argument("--output_savedir", type=str, default = '../../../data/meta_dataset')
+    parser.add_argument("--output_savedir", type=str, default = '../../data/meta_dataset')
     parser.add_argument("--n_augmentations", type=int, default = 15)
     args = parser.parse_args()
 

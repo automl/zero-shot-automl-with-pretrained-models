@@ -41,7 +41,7 @@ if __name__ == '__main__':
                     type=Path,
                     help="Specifies where the default yaml file is")
     parser.add_argument("--output_dir",
-                    default="../../../data/configs/kakaobrain_optimized_per_icgen_augmentation",
+                    default="../../data/meta_dataset/configs/kakaobrain_optimized_per_icgen_augmentation",
                     type=Path,
                     help="Specifies where the incumbent configs should be stored e.g. data/configs/experiment_name")
     parser.add_argument("--experiment_group_dir",

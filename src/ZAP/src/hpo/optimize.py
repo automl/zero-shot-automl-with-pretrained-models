@@ -100,8 +100,8 @@ def main(args):
 if __name__ == '__main__':
     p = argparse.ArgumentParser("", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     # fmt: off
-    p.add_argument("--dataset_root", default="../../../data/datasets")
-    p.add_argument("--experiment_group_dir", default = "../../../data/per_icgen_augmentation_hpo", help = "The BOHB result dir")
+    p.add_argument("--dataset_root", default="../../data/datasets")
+    p.add_argument("--experiment_group_dir", default = "../../data/per_icgen_augmentation_hpo", help = "The BOHB result dir")
     p.add_argument("--experiment_name", help="The dataset path under the dataset root. e.g 0/cifar100/")
     p.add_argument("--config_filename", default="default.yaml")
 

@@ -54,7 +54,7 @@ if __name__ == '__main__':
 
     parser.add_argument(
         "--configs_path",
-        default="../../../data/kakaobrain_optimized_per_icgen_augmentation",
+        default="../../data/kakaobrain_optimized_per_icgen_augmentation",
         type=Path,
         help="Specifies where the incumbent configurations are stored"
     )

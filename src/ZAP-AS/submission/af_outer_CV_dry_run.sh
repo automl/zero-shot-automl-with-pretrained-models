@@ -5,9 +5,6 @@
 #SBATCH -o logs/%A-%a.%x.o
 #SBATCH -e logs/%A-%a.%x.e
 
-#SBATCH --mail-user=ozturk@informatik.uni-freiburg.de
-#SBATCH --mail-type=END,FAIL
-
 #SBATCH --cpus-per-task 32
 #SBATCH --mem 192000
 

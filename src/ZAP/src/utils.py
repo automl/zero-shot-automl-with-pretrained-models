@@ -313,12 +313,12 @@ def get_real_image_sizes(datasets_main_dir, dataset_names, n_augmentations = 15)
 
 if __name__ == '__main__':
     
-    datasets_main_dir = '../../../data/datasets/'
+    datasets_main_dir = '../../data/datasets/'
     dataset_names = GROUPS['all']
     N_AUGMENTATIONS = 15
     
     # Convert training set from AutoDL to Torch tensor format
-    converted_datasets_dir = "../../../data/augmented_train_datasets_torch"
+    converted_datasets_dir = "../../data/augmented_train_datasets_torch"
     autodl2torch_wrapper(datasets_main_dir, dataset_names, converted_datasets_dir)
     
 
