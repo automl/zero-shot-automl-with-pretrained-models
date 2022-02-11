@@ -7,8 +7,11 @@ Paper link: tba
 
 # Download Models and Meta-Dataset
 Our data can be downloaded under the following links:
-* Meta-Dataset: https://bit.ly/3B1zvl0
-* Models: https://bit.ly/3BhIAGB
+* Datasets (~196G): https://bit.ly/3B1zvl0
+* Models (~700M): https://bit.ly/3BhIAGB
+* Meta-dataset: 
+
+The *Meta-dataset* download consists of the pipeline configuration files, preextracted meta-features and the performance matrix.
 
 # Installation
 
@@ -20,11 +23,13 @@ pip install -r requirements.txt
 
 # Documentation
 
+For the meta-dataset preparation steps please refer to [ZAP](src/ZAP/README.md). One may download the outputs of this step (see above: *Meta-dataset*) and skip directly to ZAP-AS or ZAP-HPO.
+
 ## 1. ZAP-AS
 
 In order to execute the experiments below please download and decompress the necessary *meta-dataset* files under './data' folder. 
 
-## 2.1. Train a single model
+### 2.1. Train a single model
 
 To train an AutoFolio model over ZAP run
 
@@ -50,7 +55,7 @@ python AutoFolioPipeline.py --tune \
 
 This tunes AutoFolio hyperparameters 5-fold cross validation given in the `PERF_MAT_FOLDER/inner_CV_folds.csv` file.
 
-## 2.2. Train a model per outer-CV
+### 2.2. Train a model per outer-CV
 
 To train AutoFolio models per core test-dataset, one needs to prepare a seperate performance matrix and meta features for each core dataset. `create_outer_CV_files.py` script creates these files as well as array job arguments for Meta. Under the `submission` folder one may find example bash scripts for different specifications of training.
 
@@ -67,3 +72,9 @@ sbatch submission/af_outer_CV_simple.sh
 ## 2. ZAP-HPO
 
 ## 3. ZAP Benchmark
+
+Mention ZAP-AS and HPO submissions are here `./baselines`.
+
+### 3.1. Create the array job arguments and run baselines
+
+### 3.2. Collect and plot the results
