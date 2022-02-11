@@ -10,8 +10,9 @@ Our data can be downloaded under the following links:
 * Datasets (~196G): https://bit.ly/3B1zvl0
 * Models (~700M): https://bit.ly/3BhIAGB
 * Meta-dataset: 
+and should be placed under `.data/datasets`, `.data/models`, `.data/meta_dataset`. 
 
-The *Meta-dataset* download consists of the pipeline configuration files, preextracted meta-features and the performance matrix.
+The *Meta-dataset* download consists of the pipeline configuration files, preextracted meta-features and the performance matrix. One can directly download this to skip costly meta-dataset acquisition procedure.
 
 # Installation
 
@@ -57,13 +58,13 @@ This tunes AutoFolio hyperparameters 5-fold cross validation given in the `PERF_
 
 ### 2.2. Train a model per outer-CV
 
-To train AutoFolio models per core test-dataset, one needs to prepare a seperate performance matrix and meta features for each core dataset. `create_outer_CV_files.py` script creates these files as well as array job arguments for Meta. Under the `submission` folder one may find example bash scripts for different specifications of training.
+To train AutoFolio models per core test-dataset, one needs to prepare a seperate performance matrix and meta features for each core dataset. `create_outer_CV_files.py` script creates these files as well as array job arguments for Meta. Under the `submission` folder one may find example bash scripts for different specifications of training. The outputted files will be the same version of inputs except the meta-test rows are dropped e.g input shape: 525x525 -> output shape: 510x525.
 
 ```
 python create_outer_CV_files.py
 ```
 
-then simply run
+then to tune (default wallclock time: 22 hours) and train the AutoFolio models simply run
 
 ```
 sbatch submission/af_outer_CV_simple.sh
@@ -71,10 +72,12 @@ sbatch submission/af_outer_CV_simple.sh
 
 ## 2. ZAP-HPO
 
-## 3. ZAP Benchmark
+# ZAP Benchmark
 
 Mention ZAP-AS and HPO submissions are here `./baselines`.
 
-### 3.1. Create the array job arguments and run baselines
+### 1. Create the array job arguments and run baselines
 
-### 3.2. Collect and plot the results
+
+
+### 2. Collect and plot the results
