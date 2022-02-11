@@ -24,7 +24,7 @@ class LogicModel(Model):
         test_dataset_aug = self.metadata.get_dataset_name().split("/")[-4]
 
         import pandas as pd
-        performances = pd.read_csv(str(Path(__file__).parents[3]/"perf_matrix.csv"), index_col = 0)
+        performances = pd.read_csv(str(Path(__file__).parents[5]/"data/meta_dataset/perf_matrix.csv"), index_col = 0)
         performances = performances.loc[test_dataset_aug+'-'+test_dataset_name]
         performances.sort_values(ascending = False, inplace = True)
 
@@ -66,7 +66,7 @@ class LogicModel(Model):
 
         LOGGER.info("The following config was chosen: {}-{}".format(aug, config_name))
 
-        config_path = Path(__file__).parents[3] / "configs" / "kakaobrain_optimized_per_icgen_augmentation" / aug / config_name
+        config_path = Path(__file__).parents[5] / "data/meta_dataset/configs" / "kakaobrain_optimized_per_icgen_augmentation" / aug / config_name
         config_path = config_path.with_suffix(".yaml")
 
         try:

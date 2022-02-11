@@ -65,7 +65,7 @@ class LogicModel(Model):
 
         LOGGER.info("The following config was chosen: {}-{}".format(aug, config_name))
 
-        config_path = Path(__file__).parents[3] / "configs" / "kakaobrain_optimized_per_icgen_augmentation" / aug / config_name
+        config_path = Path(__file__).parents[5] / "data/meta_dataset/configs" / "kakaobrain_optimized_per_icgen_augmentation" / aug / config_name
         config_path = config_path.with_suffix(".yaml")
 
         try:

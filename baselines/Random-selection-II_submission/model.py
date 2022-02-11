@@ -17,26 +17,26 @@ here = os.path.dirname(os.path.abspath(__file__))
 model_dirs = [
     '',  # current directory
     'winner_cv',  # AutoCV/AutoCV2 winner model
-    'winner_nlp',  # AutoNLP 2nd place winner
-    'winner_speech',  # AutoSpeech winner
-    'winner_tabular'  # simple NN model
+    #'winner_nlp',  # AutoNLP 2nd place winner
+    #'winner_speech',  # AutoSpeech winner
+    #'winner_tabular'  # simple NN model
 ]
 for model_dir in model_dirs:
     sys.path.append(os.path.join(here, model_dir))
 
 from winner_cv.model import Model as AutoCVModel  # isort:skip
-from winner_nlp.model import Model as AutoNLPModel  # isort:skip
-from winner_speech.model import Model as AutoSpeechModel  # isort:skip
-from winner_tabular.model import Model as TabularModel  # isort:skip
+#from winner_nlp.model import Model as AutoNLPModel  # isort:skip
+#from winner_speech.model import Model as AutoSpeechModel  # isort:skip
+#from winner_tabular.model import Model as TabularModel  # isort:skip
 
 # fmt: on
 
 DOMAIN_TO_MODEL = {
     'image': AutoCVModel,
-    'video': AutoCVModel,
-    'text': AutoNLPModel,
-    'speech': AutoSpeechModel,
-    'tabular': TabularModel
+    #'video': AutoCVModel,
+    #'text': AutoNLPModel,
+    #'speech': AutoSpeechModel,
+    #'tabular': TabularModel
 }
 
 

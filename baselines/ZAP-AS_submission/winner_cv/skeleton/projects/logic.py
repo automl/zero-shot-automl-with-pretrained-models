@@ -24,17 +24,11 @@ class LogicModel(Model):
         super(LogicModel, self).__init__(metadata)
         # execute installs here
 
-        b2_datasets = ['MUNSTER', 'CITY', 'CHUCKY', 'PEDRO', 'DECAL', 'HAMMER']
-
         test_dataset_name = self.metadata.get_dataset_name().split("/")[-3]
         print(test_dataset_name)
 
-        if test_dataset_name.upper() in b2_datasets:
-            p = Path(__file__).parents[3] / "v2_model"
-        else:
-            p = Path(__file__).parents[3] / "AutoFolio_models" / test_dataset_name
-
-
+        
+        p = Path(__file__).parents[5] / "data/models/AutoFolio_models/ZAP" / test_dataset_name
         model_fn = str(p)
         print(model_fn)
 
@@ -83,7 +77,7 @@ class LogicModel(Model):
 
         LOGGER.info("The following config was chosen: {}-{}".format(aug, config_name))
 
-        config_path = Path(__file__).parents[3] / "configs" / "kakaobrain_optimized_per_icgen_augmentation" / aug / config_name
+        config_path = Path(__file__).parents[5] / "data/meta_dataset/configs" / "kakaobrain_optimized_per_icgen_augmentation" / aug / config_name
         config_path = config_path.with_suffix(".yaml")
 
         try:
