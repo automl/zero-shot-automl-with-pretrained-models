@@ -54,7 +54,7 @@ python -m AutoFolioPipeline --tune \
   --perf_path ../../data/meta_dataset/perf_matrix.csv \
   --feat_path ../../data/meta_dataset/meta_features.csv \
   --cv_csv ../../data/meta_dataset/inner_CV_folds.csv \
-  --autofolio_model_path ../../data/AutoFolio_models/ZAP \
+  --autofolio_model_path ../../data/models/AutoFolio_models/ZAP \
   --exp_suffix ZAP_single
 ```
 
