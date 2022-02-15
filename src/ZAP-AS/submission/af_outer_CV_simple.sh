@@ -16,4 +16,4 @@ ARGS_FILE=submission/AutoFolio_args/ZAP-AS.args
 TASK_SPECIFIC_ARGS=$(sed "${SLURM_ARRAY_TASK_ID}q;d" $ARGS_FILE)
 echo $TASK_SPECIFIC_ARGS
 
-python AutoFolioPipeline.py --tune --autofolio_model_path "../../data/models/AutoFolio_models/per_icgen_augmentation" $TASK_SPECIFIC_ARGS
+python AutoFolioPipeline.py --tune --autofolio_model_path "../../data/models/AutoFolio_models/ZAP" $TASK_SPECIFIC_ARGS

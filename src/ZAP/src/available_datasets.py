@@ -46,3 +46,16 @@ if __name__ == '__main__':
         print('Dataset group {} contains {} dataset(s). These are ->'.format(group, len(elements)))
         print('\n'.join(elements))
         print('='*60)
+
+    import pandas as pd
+    import numpy as np
+    
+    folds = [float(i+1) for i, datasets in enumerate(train_splits) for _ in datasets for n in range(N_AUGMENTATIONS)]
+    train_splits_index = []
+    for k in train_splits:
+        train_splits_index += k
+
+    train_splits_index_augmented = [str(n)+"-"+dataset for dataset in train_splits_index for n in range(N_AUGMENTATIONS)]
+    folds_df = pd.DataFrame(folds, index = train_splits_index_augmented, columns = ["fold"])
+    folds_df.to_csv("../../data/meta_dataset/inner_CV_folds.csv", index = True)
+

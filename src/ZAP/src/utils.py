@@ -12,7 +12,7 @@ from PIL import Image
 from torchvision import transforms
 
 sys.path.append(os.getcwd())
-from src.available_datasets import all_datasets, few_shot_datasets, GROUPS
+from src.available_datasets import all_datasets, GROUPS
 
 import torch
 

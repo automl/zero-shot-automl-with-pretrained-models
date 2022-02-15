@@ -6,7 +6,6 @@
 #SBATCH -e logs/%A-%a.%x.e
 
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task 1
 
 #SBATCH -a 1-826875
 

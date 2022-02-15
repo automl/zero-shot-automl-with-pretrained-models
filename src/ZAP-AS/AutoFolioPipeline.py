@@ -12,8 +12,8 @@ import time
 import pandas as pd
 import numpy as np
 
-from src.AutoFolio.autofolio.autofolio import AutoFolio
-from src.available_datasets import all_datasets
+from AutoFolio.autofolio.autofolio import AutoFolio
+from available_datasets import all_datasets
 
 sys.path.insert(0, os.path.abspath("AutoFolio"))
 

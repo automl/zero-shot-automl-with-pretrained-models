@@ -16,7 +16,7 @@ def construct_command(config, dataset, base_datasets_dir, repeat, configs_path):
     )
 
 
-def generate_all_commands(configs_path, args_savepath, n_repeats, num_config_subsets, num_dataset_subsets):
+def generate_all_commands(configs_path, dataset_root, args_savepath, n_repeats, num_config_subsets, num_dataset_subsets):
     """
     Parameters:
         configs_path: Path to the configs' dir for evaluation. 
@@ -25,15 +25,16 @@ def generate_all_commands(configs_path, args_savepath, n_repeats, num_config_sub
         num_config_subsets: Number of configurations subsets to use in the experiment.
         num_dataset_subsets:  Number of dataset subsets to use in the experiment.
     """
-    with Path(configs_path.parent, "default.yaml").open() as in_stream:
+    with Path("src/configs/default.yaml").open() as in_stream:
         config = yaml.safe_load(in_stream)
-        print("using {} as default config file".format(str(configs_path.parent) + "/default.yaml"))
-    base_datasets_dir = config["cluster_datasets_dir"]
+        print("using {} as default config file".format("src/configs/default.yaml"))
+    base_datasets_dir = dataset_root
 
     all_configs = []
     for n in range(num_config_subsets):
         config_path = Path(configs_path, str(n))
         all_configs += [os.path.join(str(n), inaug_path.name) for inaug_path in config_path.glob("*")]
+
 
     all_augmented_datasets = [os.path.join(str(n), dataset) for n in range(num_dataset_subsets) for dataset in all_datasets]
 
@@ -54,15 +55,24 @@ if __name__ == '__main__':
 
     parser.add_argument(
         "--configs_path",
-        default="../../data/kakaobrain_optimized_per_icgen_augmentation",
+        default="../../data/configs/kakaobrain_optimized_per_icgen_augmentation",
         type=Path,
         help="Specifies where the incumbent configurations are stored"
     )
+
+    parser.add_argument(
+        "--dataset_root",
+        default="../../data/datasets",
+        type=Path,
+        help="Specifies where the datasets are stored"
+    )
+
     parser.add_argument(
         "--args_savepath",
         default="per_icgen_augmentation_x_configs.args",
         help="Specifies the name of the args file to be outputted"
     )
+
     parser.add_argument(
         "--n_repeats",
         default=3,
@@ -87,5 +97,5 @@ if __name__ == '__main__':
 
     args_savepath = Path("submission") / args.args_savepath
     
-    generate_all_commands(args.configs_path, args_savepath, args.n_repeats, args.num_config_subsets, args.num_dataset_subsets)
+    generate_all_commands(args.configs_path, args.dataset_root, args_savepath, args.n_repeats, args.num_config_subsets, args.num_dataset_subsets)
 

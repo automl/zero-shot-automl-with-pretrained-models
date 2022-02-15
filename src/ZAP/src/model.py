@@ -39,7 +39,7 @@ class Model():
         """
         if model_config is None:
             model_config_name = model_config_name or "default.yaml"
-            with open(os.path.join(here, "configs", model_config_name)) as stream:
+            with open(os.path.join("../../data", "configs", model_config_name)) as stream:
                 model_config = yaml.safe_load(stream)
 
         self.done_training = False

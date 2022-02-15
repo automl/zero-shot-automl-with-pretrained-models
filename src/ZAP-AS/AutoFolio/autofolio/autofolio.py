@@ -6,7 +6,7 @@ import traceback
 from itertools import tee
 
 import sys
-sys.path.append("src/AutoFolio")
+sys.path.append("AutoFolio")
 
 import numpy as np
 import pandas as pd

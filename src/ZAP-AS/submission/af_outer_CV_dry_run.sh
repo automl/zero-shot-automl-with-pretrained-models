@@ -5,8 +5,8 @@
 #SBATCH -o logs/%A-%a.%x.o
 #SBATCH -e logs/%A-%a.%x.e
 
-#SBATCH --cpus-per-task 32
-#SBATCH --mem 192000
+#SBATCH --cpus-per-task 1
+#SBATCH --mem 6000
 
 #SBATCH -a 1-1
 

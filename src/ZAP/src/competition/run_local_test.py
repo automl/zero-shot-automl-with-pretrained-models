@@ -139,8 +139,7 @@ if __name__ == "__main__":
 
     default_dataset_dir = os.path.join(_HERE(), "sample_data", "miniciao")
     parser.add_argument("--dataset_dir", default=default_dataset_dir, help=" ")
-    parser.add_argument("--experiment_main_dir", default = "/work/dlclarge2/ozturk-experiments")
-    parser.add_argument("--experiment_group", default="test", help=" ")
+    parser.add_argument("--experiment_group_dir", default = "../../data/per_icgen_augmentation_x_configs_evaluations")
     parser.add_argument("--experiment_name", default="default", help=" ")
     parser.add_argument("--model_config_name", default="default.yaml", help="The config in src/configs to use")
     parser.add_argument("--code_dir", default="src", help=" ")
@@ -156,6 +155,6 @@ if __name__ == "__main__":
     time_budget_approx = args.time_budget_approx
     overwrite = args.overwrite
     model_config_name = args.model_config_name
-    experiment_dir = str(Path(args.experiment_main_dir, args.experiment_group, args.experiment_name))
+    experiment_dir = str(Path(args.experiment_group_dir, args.experiment_name))
 
     run_baseline(dataset_dir, code_dir, experiment_dir, time_budget, time_budget_approx, overwrite, model_config_name)

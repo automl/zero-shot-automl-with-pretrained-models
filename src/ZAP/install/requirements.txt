@@ -1,4 +1,4 @@
-# Python 3.5
+# Python 3.7
 
 
 # Dev
@@ -33,15 +33,3 @@ ConfigSpace
 pyrfr
 smac>=0.11.1
 git+https://github.com/mlindauer/ASlibScenario
-
-# Packages for NLP/speech optimization
-#pip install torch==1.2.0 torchvision==0.4.0 -f https://download.pytorch.org/whl/torch_stable.html
-
-# Packages from AutoNLP
-# More info: https://hub.docker.com/r/wahaha909/autonlp
-# jieba==0.39
-# nltk==3.4.4
-# spacy==2.1.6
-# gensim==3.8.0
-# polyglot==16.7.4
-# transformers==2.2.0
