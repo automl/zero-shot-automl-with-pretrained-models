@@ -39,22 +39,22 @@ python -m src.avalable_datasets
 To train an AutoFolio model over ZAP run
 
 ```
-python AutoFolioPipeline.py --tune \
-  --perf_path PATH_TO_COST_MATRIX
-  --feat_path PATH_TO_META_FEATURES
-  --cv_csv PATH_TO_INNER_CV_FOLDS
-  --autofolio_model_path PATH_TO_RESULTING_MODEL(S)
-  --exp_suffix MODEL_SAVENAME
+python -m AutoFolioPipeline.py --tune \
+  --perf_path PATH_TO_COST_MATRIX \
+  --feat_path PATH_TO_META_FEATURES \
+  --cv_csv PATH_TO_INNER_CV_FOLDS \
+  --autofolio_model_path PATH_TO_RESULTING_MODEL(S) \
+  --exp_suffix MODEL_SAVENAME \
 ```
 
 e.g
 
 ```
-python AutoFolioPipeline.py --tune \
-  --perf_path ../../data/meta_dataset/perf_matrix.csv 
-  --feat_path ../../data/meta_dataset/meta_features.csv
-  --cv_csv ../../data/meta_dataset/inner_CV_folds.csv
-  --autofolio_model_path ../../data/AutoFolio_models/ZAP
+python -m AutoFolioPipeline --tune \
+  --perf_path ../../data/meta_dataset/perf_matrix.csv \
+  --feat_path ../../data/meta_dataset/meta_features.csv \
+  --cv_csv ../../data/meta_dataset/inner_CV_folds.csv \
+  --autofolio_model_path ../../data/AutoFolio_models/ZAP \
   --exp_suffix ZAP_single
 ```
 
