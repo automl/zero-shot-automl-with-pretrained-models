@@ -28,7 +28,11 @@ For the meta-dataset preparation steps please refer to [ZAP](src/ZAP/README.md).
 
 ## 1. ZAP-AS
 
-In order to execute the experiments below please download and decompress the necessary *meta-dataset* files under './data' folder. 
+In order to execute the experiments below please download and decompress the necessary *meta-dataset* files under './data' folder. Then tto prepare the inner CV folds that is required for tuning the AutoFolio model can be prepared by simply running:
+
+```
+python -m src.avalable_datasets
+```
 
 ### 2.1. Train a single model
 
