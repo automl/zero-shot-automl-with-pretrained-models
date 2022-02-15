@@ -64,7 +64,7 @@ To evaluate each ZAP pipeline-dataset pair (on Meta):
   e.g
   
   ```
-  python submission/create_datasets_x_configs_args.py --configs_path ../../data/kakaobrain_optimized_per_icgen_augmentation \
+  python submission/create_datasets_x_configs_args.py --configs_path ../../data/configs/kakaobrain_optimized_per_icgen_augmentation \
                                                       --args_savepath per_icgen_augmentation_x_configs.args
   ```
 
