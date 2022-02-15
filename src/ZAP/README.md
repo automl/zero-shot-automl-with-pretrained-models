@@ -102,5 +102,5 @@ python -m src.meta_features.precompute_meta_features --dataset_dir DATASETS_PARE
 e.g.
 
 ```
-python -m src.meta_features.precompute_meta_features --dataset_dir ../../data/datasets  --output_savedir ../data/meta_dataset/
+python -m src.meta_features.precompute_meta_features --dataset_dir ../../data/datasets  --output_savedir ../../data/meta_dataset/
 ```
