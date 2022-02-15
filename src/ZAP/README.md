@@ -2,7 +2,7 @@
 
 Consists of necessary steps to prepare the meta-dataset
 
-## 0. Environment
+## 0. Environment and Data
 Create and activate a Python 3.7 environment and run
 ```bash
 bash install/requirements_gcc.sh
@@ -12,6 +12,8 @@ bash install/install_winner_cv.sh
 bash install/install_just.sh        # Optional command runner
 bash install/install_precommit.sh   # Developer dependency
 ```
+
+The only data required for the steps below is the datasets. Please find the instructions on downloading and placing the datasets on the main page.
 
 ## 1. Offline Preparation
 
