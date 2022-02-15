@@ -80,7 +80,7 @@ Change the array job arguments filename to *submission/ARGS_JOBFILE_PATH* and (o
   python src/hpo/performance_matrix_from_evaluation.py --experiment_group EVALUATION_RES_DIR --output_savedir META_DATASET_OUTPUT_DIR
   ```
   
-  e.g
+  e.g.
   
   ```
   python src/hpo/performance_matrix_from_evaluation.py --experiment_group "../../data/per_icgen_augmentation_x_configs_evaluations" \
@@ -97,4 +97,10 @@ To extract the simple meta-features of ZAP datasets, run the command below:
 
 ```
 python -m src.meta_features.precompute_meta_features --dataset_dir DATASETS_PARENT_PATH  --output_savedir META_DATASET_OUTPUT_DIR
+```
+
+e.g.
+
+```
+python -m src.meta_features.precompute_meta_features --dataset_dir ../../data/datasets  --output_savedir ../data/meta_dataset/
 ```
