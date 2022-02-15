@@ -58,14 +58,14 @@ To evaluate each ZAP pipeline-dataset pair (on Meta):
 
 1. Create array job arguments
   ```
-  python submission/create_datasets_x_configs_args.py --configs_path CONFIG_OUTPUT_DIR --command_file_name ARGS_JOBFILE_PATH
+  python submission/create_datasets_x_configs_args.py --configs_path CONFIG_OUTPUT_DIR --args_savepath ARGS_JOBFILE_PATH
   ```
   
   e.g
   
   ```
   python submission/create_datasets_x_configs_args.py --configs_path ../../data/kakaobrain_optimized_per_icgen_augmentation \
-                                                      --command_file_name per_icgen_augmentation_x_configs.args
+                                                      --args_savepath per_icgen_augmentation_x_configs.args
   ```
 
 2. Run the jobs on Meta
