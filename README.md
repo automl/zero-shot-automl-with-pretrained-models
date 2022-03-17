@@ -78,10 +78,49 @@ sbatch submission/af_outer_CV_simple.sh
 
 # ZAP Benchmark
 
-Mention ZAP-AS and HPO submissions are here `./baselines`.
+Mention ZAP-AS and HPO submissions are here 
+This benchmark contains the 525 ZAP datasets. 
+
+The solutions in submission format are under `./baselines` including the ZAP-AS and ZAP-HPO submissions.
 
 ### 1. Create the array job arguments and run baselines
 
+The `baselines/` folder contains all the baselines and variations of our approach.
 
+First
+
+```
+cd baselines/
+```
+
+and
+
+```
+python submission/create_benchmarking_args.py
+```
+
+will create arguments for all solutions provided, shuffles and splits them into batches. Then one can submit batch by batch via
+
+```
+sbatch submission/benchmarking.sh
+```
+
+by only changing `ARGS_FILE` parameter inside the script.
 
 ### 2. Collect and plot the results
+
+The above procedure will provide *raw* AutoDL outputs, which includes a `scoring.txt` file for each run. To read these files(time-consuming), save in a nice json format for later use, and also plot the experiment results on the paper run 
+
+```
+python analysis/get_benchmarking_results.py
+```
+
+One can switch off `parse_and_collect_results()` method inside the script above after the first execution and switch on if only there is a modification. This script also provides box plots and ranking results in the paper.
+
+For the cost matrix heat map and meta-feature scatter plot run
+
+```
+python analysis/meta_dataset/meta_dataset_analysis.py
+```
+
+This will provide these two plots under the `analysis/meta_dataset/`.
