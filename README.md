@@ -9,7 +9,8 @@ Paper link: tba
 Our data can be downloaded under the following links:
 * Datasets (~196G): https://bit.ly/3B1zvl0
 * Models (~700M): https://bit.ly/3BhIAGB
-* Meta-dataset: 
+* Meta-dataset: https://bit.ly/3NnhP8W 
+
 and should be placed under `.data/datasets`, `.data/models`, `.data/meta_dataset`. 
 
 The *Meta-dataset* download consists of the pipeline configuration files, preextracted meta-features and the performance matrix. One can directly download this to skip costly meta-dataset acquisition procedure.
