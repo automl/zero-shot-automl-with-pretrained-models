@@ -22,9 +22,9 @@ def construct_csv(meta_feat, perf_mat, incumbent_list):
     meta_dict=[value for value in meta_feat.to_dict('index').values()]
     data_csv=[]
     # Can it be faster??
-    for features in meta_dict[:1]:
+    for features in meta_dict:
         # accuracy for testing on features['dataset] by incumbent eg  accuracy.loc[[incumbent]]
-        for incumbent in incumbent_list[:3]:
+        for incumbent in incumbent_list:
             print('Finding for incumbent {} and test dataset {}'.format(incumbent, features['dataset']))
             features['incumbent_of'] = incumbent
             accuracy= perf_mat.loc[[features['dataset']]][incumbent]
