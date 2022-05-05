@@ -18,8 +18,8 @@ import os
 import numpy as np
 import time
 from tqdm import tqdm
-from utils import Log, get_log, save_model
-from loader import get_tr_loader, get_ts_loader
+from utils import Log,get_log,save_model
+from loader import get_tr_loader,get_ts_loader
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 #from torch.utils.tensorboard import SummaryWriter
@@ -87,7 +87,7 @@ class ModelRunner:
         self.acc_std = self.mtrloader.dataset.std_output
         extra = str(-self.sparsity) if self.sparsity > 0 else ""
         extra += "-no-meta" if not self.use_meta else ""
-        self.model_path = os.path.join(self.save_path, str(self.mode)+extra, str(self.cv))
+        self.model_path = os.path.join(self.save_path, str(self.mode)+extra, str(self.seed), str(self.loo),str(self.cv))
         
         os.makedirs(self.model_path, exist_ok=True)
         self.mtrlog = Log(self.args, open(os.path.join(self.model_path, 'meta_train_predictor.log'), 'w'))
@@ -106,7 +106,6 @@ class ModelRunner:
         test_log_dir = os.path.join(self.model_path,"test")
         os.makedirs(test_log_dir,exist_ok=True)
         self.test_summary_writer = SummaryWriter(test_log_dir)       
-    
     def train(self):
         for epoch in range(1, self.max_epoch + 1):
             self.mtrlog.ep_sttime = time.time()
@@ -130,7 +129,6 @@ class ModelRunner:
                 save_model(epoch, self.model, self.model_path)
             vandcg.update({"acc":vaccc,
                            "rank":vacorr})
-            
             #for k,v in vandcg.items():
                 #self.valid_summary_writer.add_scalar(k, v, epoch)                            
             trndcg.update({"acc":tracc,
@@ -292,13 +290,13 @@ if __name__=="__main__":
     parser.add_argument('--seed', type=int, default=333)
     parser.add_argument('--save_path', type=str, default='../ckpts', help='the path of save directory')
     parser.add_argument('--data_path', type=str, default='../../data', help='the path of save directory')
-    parser.add_argument('--mode', type=str, default='bpr', help='training objective',choices=["regression","bpr"])
+    parser.add_argument('--mode', type=str, default='regression', help='training objective',choices=["regression","bpr"])
     parser.add_argument('--save_epoch', type=int, default=20, help='how many epochs to wait each time to save model states') 
     parser.add_argument('--max_epoch', type=int, default=400, help='number of epochs to train')
     parser.add_argument('--batch_size', type=int, default=64, help='batch size for generator')
     parser.add_argument('--loo', type=int, default=1, help='Index of dataset [0,34] that should be removed')
     parser.add_argument('--cv', type=int, default=1, help='Index of CV [1,5]')
-    parser.add_argument('--split_type', type=str, default="cv", help='cv|loo')
+    parser.add_argument('--split_type', type=str, default="loo", help='cv|loo')
     parser.add_argument('--sparsity', type=float, default=0.0)
     parser.add_argument('--use_meta', type=str, default="True", choices=["True","False"])    
     args = parser.parse_args()

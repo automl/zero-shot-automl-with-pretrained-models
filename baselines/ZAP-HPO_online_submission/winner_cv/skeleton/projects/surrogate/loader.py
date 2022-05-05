@@ -27,7 +27,6 @@ _numerical_hps = ['early_epoch', 'first_simple_model', 'max_inner_loop_ratio', '
        'wd']
 _apply_log = ["lr","wd","min_lr"]
 
-
 class TestDatabase(Dataset):
   def __init__(self, data_path, loo, mean_input, std_input, mean_output, std_output,split_type="cv", use_meta=True):
     
@@ -67,9 +66,33 @@ class TestDatabase(Dataset):
   def __getitem__(self, index):
     x = self.x[index]
     y = self.y[index]
-    y = ((y- self.mean_output) / self.std_output)
-    x = ((x- self.mean_input) / self.std_input)
+    y = ((y - self.mean_output) / self.std_output)
+    x = ((x - self.mean_input) / self.std_input)
     return x, y
+
+class TestDatabaseOnline(Dataset):
+  def __init__(self, data, loo, mean_input, std_input, split_type="cv", use_meta=True):
+       
+    # process input
+    predictors  = _list_of_metafeatures+_numerical_hps+_bool_hps+_categorical_hps if use_meta else _numerical_hps+_bool_hps+_categorical_hps
+    attributes = data[predictors].copy()
+    for alog in _apply_log:
+        attributes[alog] = attributes[alog].apply(lambda x: np.log(x))
+    self.mean_input = mean_input
+    self.std_input = std_input
+
+    X_test = np.array(attributes)
+
+    self.x = torch.tensor(X_test.astype(np.float32))
+    
+  def __len__(self):
+    return len(self.x)
+
+  def __getitem__(self, index):
+    x = self.x[index]
+    x = ((x- self.mean_input) / self.std_input)
+    return x
+
 
 class TrainDatabase(Dataset):
     
@@ -107,7 +130,7 @@ class TrainDatabase(Dataset):
         smaller_idx = self.rng.choice(self.smaller_set[index])
     except ValueError:
         smaller_idx = index
-    x = ((x - self.mean_input) / self.std_input)
+    x = ((x- self.mean_input) / self.std_input)
     s = ((self.x[self.training][smaller_idx] - self.mean_input) / self.std_input)
     r_s = self.ranks_flat[self.training][smaller_idx]
     l = ((self.x[self.training][larger_idx]- self.mean_input) / self.std_input)
@@ -152,9 +175,6 @@ class TrainDatabaseCV(TrainDatabase):
         self.std_input = np.ones(X_train.shape[ 1 ]).astype(np.float32)
         self.mean_input = np.zeros(X_train.shape[ 1 ]).astype(np.float32)
 
-    self.mean_input = torch.from_numpy(self.mean_input)
-    self.std_input = torch.from_numpy(self.std_input)
-    
     # process output
     y_train = data[data.dataset.isin(training_cls)]["accuracy"].ravel()
     y_valid= data[data.dataset.isin(valid_cls)]["accuracy"].ravel()
@@ -390,7 +410,12 @@ def get_tr_loader(batch_size, data_path, loo, mode,use_meta=True, cv=None, split
 def get_ts_loader(batch_size, data_path, loo, mu_in,std_in,mu_out,std_out, split_type="cv",use_meta=True):
   dataset = TestDatabase(data_path, loo,mu_in,std_in,mu_out,std_out, split_type=split_type,use_meta=use_meta)
   loader = DataLoader(dataset=dataset,batch_size=batch_size,shuffle=False)
-  return loader    
+  return loader
+
+def get_ts_loader_online(batch_size, data, loo, mu_in, std_in, split_type="cv",use_meta=True):
+  dataset = TestDatabaseOnline(data, loo, mu_in, std_in, split_type=split_type,use_meta=use_meta)
+  loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False)
+  return loader 
 
 # mtrloader,mtrloader_unshuffled =  get_tr_loader(64, "data", 1, 
                                         # mode="bpr",split_type="cv")
