@@ -24,12 +24,12 @@ def construct_csv(meta_feat, perf_mat, incumbent_list, save_as):
     # Can it be faster??
     for features in tqdm.tqdm(meta_dict):
         # accuracy for testing on features['dataset] by incumbent eg  accuracy.loc[[incumbent]]
+        accuracy_list = perf_mat.loc[[features['dataset']]]
         for incumbent in incumbent_list:
             new_row = {**features, 'incumbent_of': incumbent}
-            accuracy_list = perf_mat.loc[[new_row['dataset']]]
             accuracy = accuracy_list[incumbent].values.item()
             # -1 because rank sets the lowest to 1 and data_m.csv uses 0. False so highest score is ranked 1st
-            ranks = accuracy_list.rank(axis=1, ascending=False, method='first') - 1
+            ranks = accuracy_list.rank(axis=1, ascending=False, method='max') - 1
             # value returns as a series
             new_row['accuracy'] = accuracy
             # open the relevant yaml from the incumbent, (replace to get paths right)

@@ -32,7 +32,7 @@ class TestDatabase(Dataset):
   def __init__(self, data_path, loo, mean_input, std_input, mean_output, std_output,split_type="cv", use_meta=True):
     
     # read data
-    data =pd.read_csv(os.path.join(data_path,"data_m.csv"),header=0)
+    data =pd.read_csv(os.path.join(data_path,"data_m_gen.csv"),header=0)
     if split_type=="loo":
         with open(os.path.join(data_path,"cls_names.pkl"),"rb") as f:
             self.cls = pickle.load(f)
@@ -125,7 +125,7 @@ class TrainDatabaseCV(TrainDatabase):
     self.rng = np.random.RandomState(0)
     self.valid_rng = np.random.RandomState(0)
     # read data
-    data = pd.read_csv(os.path.join(data_path,"data_m.csv"),header=0)
+    data = pd.read_csv(os.path.join(data_path,"data_m_gen.csv"),header=0)
     cv_folds = pd.read_csv(os.path.join(data_path,"cv_folds.csv"),header=0)
     cls = list(cv_folds[~cv_folds["fold"].isin([cv])]["Unnamed: 0"].apply(lambda x: x.split("-")[1]).unique())
     valid_cls_names = self.valid_rng.choice(cls,replace=False,size=3)
@@ -210,7 +210,7 @@ class TrainDatabaseCVPlusLoo(TrainDatabase):
     self.rng2 = np.random.RandomState(0)
     self.valid_rng = np.random.RandomState(0)
     # read data
-    data = pd.read_csv(os.path.join(data_path,"data_m.csv"),header=0)
+    data = pd.read_csv(os.path.join(data_path,"data_m_gen.csv"),header=0)
     cv_folds = pd.read_csv(os.path.join(data_path,"cv_folds.csv"),header=0)
     with open(os.path.join(data_path,"cls_names.pkl"),"rb") as f:
         self.cls = pickle.load(f)
