@@ -22,7 +22,7 @@ _bool_hps = ["first_simple_model", "amsgrad", "nesterov"]
 _categorical_hps = ['simple_model_LR', 'simple_model_NuSVC', 'simple_model_RF',
        'simple_model_SVC', 'architecture_ResNet18',
        'architecture_efficientnetb0', 'architecture_efficientnetb1',
-       'architecture_efficientnetb2', 'scheduler_cosine', 'scheduler_plateau']
+       'architecture_efficientnetb2', 'scheduler_cosine', 'scheduler_plateau', 'optimiser_sgd','optimiser_adam', 'optimiser_adamw']
 
 N_AUGMENTATIONS = 15
 all_datasets = ['cifar100', 'cycle_gan_vangogh2photo', 'uc_merced', 'cifar10', 'cmaterdb_devanagari', 
@@ -41,7 +41,7 @@ HP_NAMES = ["cv_valid_ratio", "max_valid_count", "max_size", "train_info_sample"
 HP_NAMES = _numerical_hps+_categorical_hps
 
 ENCODE_ARCH = {'ResNet18':[1, 0, 0, 0],'efficientnetb0': [0, 1, 0, 0], 'efficientnetb1': [0, 0, 1, 0], 'efficientnetb2': [0, 0, 0, 1]}
-#ENCODE_OPTIM = {'SGD': [0, 0, 1], 'Adam': [0, 1, 0], 'AdamW': [1, 0, 0]}
+ENCODE_OPTIM = {'SGD': [0, 0, 1], 'Adam': [0, 1, 0], 'AdamW': [1, 0, 0]}
 ENCODE_SIMPLE_MODEL = {'SVC': [0, 0, 0, 1], 'NuSVC': [0, 1, 0, 0], 'RF': [0, 0, 1, 0], 'LR': [1, 0, 0, 0]}
 ENCODE_SCHED = {'plateau': [0, 1], 'cosine': [1, 0]}
 
@@ -97,7 +97,7 @@ def create_searchspace(path):
     hp_vector += ENCODE_ARCH[config['architecture']]  # 4
     hp_vector += ENCODE_SCHED[config['scheduler']]
 
-    # hp_vector += ENCODE_OPTIM[config['type']] #
+    hp_vector += ENCODE_OPTIM[config['type']]
     return dict(zip(HP_NAMES,hp_vector))
     hpo_X.append(hp_vector)
 
