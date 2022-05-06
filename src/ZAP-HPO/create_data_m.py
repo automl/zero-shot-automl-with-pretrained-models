@@ -22,7 +22,7 @@ def construct_csv(meta_feat, perf_mat, incumbent_list, save_as):
     meta_dict = [value for value in meta_feat.to_dict('index').values()]
     data_csv = []
     # Can it be faster??
-    for features in tqdm.tqdm(meta_dict[:1]):
+    for features in tqdm.tqdm(meta_dict):
         # accuracy for testing on features['dataset] by incumbent eg  accuracy.loc[[incumbent]]
         for incumbent in incumbent_list:
             new_row = {**features, 'incumbent_of': incumbent}
