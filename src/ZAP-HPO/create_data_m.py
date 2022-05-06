@@ -43,8 +43,6 @@ def construct_csv(meta_feat, perf_mat, incumbent_list, save_as):
     data_df.set_index(['dataset'])
     data_df.to_csv(save_as, index=False)
 
-    print('stop here')
-
 
 if __name__ == "__main__":
     start = time.time()
@@ -63,7 +61,7 @@ if __name__ == "__main__":
     all_yaml_paths, incumbent_of, perf_matrix = get_config_response(config_dir=top_config,
                                                                     response_dir=os.path.join(args.metadata_path,
                                                                                               'perf_matrix.csv'))
-    construct_csv(meta_features, perf_matrix, sorted(incumbent_of), args.save_file)
+    construct_csv(meta_features, perf_matrix, sorted(incumbent_of), os.path.join(args.save_path,args.save_file))
     end = time.time()
     hours, rem = divmod(end - start, 3600)
     minutes, seconds = divmod(rem, 60)
