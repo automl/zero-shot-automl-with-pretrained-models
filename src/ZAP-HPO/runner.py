@@ -64,7 +64,7 @@ class ModelRunner:
         self.max_corr_dict = {'rank@1': np.inf, 'epoch': -1, "ndcg@5":-1, "ndcg@10":-1, "ndcg@20":-1}
         cs = self.get_configspace(self.seed)
         config = cs.sample_configuration()
-        self.model = batch_mlp(d_in=39 if self.use_meta else 35,output_sizes=config["num_hidden_layers"]*[config["num_hidden_units"]]+[1],
+        self.model = batch_mlp(d_in=42 if self.use_meta else 38,output_sizes=config["num_hidden_layers"]*[config["num_hidden_units"]]+[1],
                                dropout=config["dropout_rate"])
         self.model.to(self.device)
         config["lr"]=1e-3
