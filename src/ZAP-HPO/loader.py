@@ -17,7 +17,8 @@ _bool_hps = ["first_simple_model", "amsgrad", "nesterov"]
 _categorical_hps = ['simple_model_LR', 'simple_model_NuSVC', 'simple_model_RF',
        'simple_model_SVC', 'architecture_ResNet18',
        'architecture_efficientnetb0', 'architecture_efficientnetb1',
-       'architecture_efficientnetb2', 'scheduler_cosine', 'scheduler_plateau']
+       'architecture_efficientnetb2', 'scheduler_cosine', 'scheduler_plateau', 
+       'optimiser_sgd', 'optimiser_adam', 'optimiser_adamw']
 _numerical_hps = ['early_epoch', 'first_simple_model', 'max_inner_loop_ratio', 'min_lr',
        'skip_valid_score_threshold', 'test_after_at_least_seconds',
        'test_after_at_least_seconds_max', 'test_after_at_least_seconds_step',
@@ -29,7 +30,7 @@ _apply_log = ["lr","wd","min_lr"]
 
 
 class TestDatabase(Dataset):
-  def __init__(self, data_path, loo, mean_input, std_input, mean_output, std_output,split_type="cv", use_meta=True):
+  def __init__(self, data_path, loo, mean_input, std_input, mean_output, std_output, split_type="cv", use_meta=True):
     
     # read data
     data =pd.read_csv(os.path.join(data_path,"data_m_gen.csv"),header=0)
@@ -115,8 +116,7 @@ class TrainDatabase(Dataset):
     return (x,s,l), (y,self.y[self.training][smaller_idx],self.y[self.training][larger_idx]), (r,r_s,r_l)
     
 class TrainDatabaseCV(TrainDatabase):
-  def __init__(self, data_path, cv, output_normalization=False,
-               input_normalization=True, mode="regression"):
+  def __init__(self, data_path, cv, output_normalization=False, input_normalization=True, mode="regression", use_meta=True):
     super(TrainDatabase, self).__init__()
     self.training = "train"
     self.output_normalization = output_normalization
@@ -135,7 +135,9 @@ class TrainDatabaseCV(TrainDatabase):
             valid_cls.append(f"{i}-{v}")
     training_cls = np.setdiff1d(list(cv_folds[~cv_folds["fold"].isin([cv])]["Unnamed: 0"]),valid_cls).tolist()
     # process input
-    attributes = data[_list_of_metafeatures+_numerical_hps+_bool_hps+_categorical_hps].copy()
+    predictors  = _list_of_metafeatures+_numerical_hps+_bool_hps+_categorical_hps if use_meta else _numerical_hps+_bool_hps+_categorical_hps
+    attributes = data[predictors].copy()
+    #attributes = data[_list_of_metafeatures+_numerical_hps+_bool_hps+_categorical_hps].copy()
     
     for alog in _apply_log:
         attributes[alog] = attributes[alog].apply(lambda x: np.log(x))
@@ -188,7 +190,7 @@ class TrainDatabaseCV(TrainDatabase):
         for i in range(ndatasets):
             y_star += [max(self.values[thing][i])*torch.ones(525)]
         self.y_star.update({thing:torch.cat(y_star)})
-    if mode=="bpr":
+    if mode=="bpr" or mode=="tml":
         self.larger_set = []
         self.smaller_set = []
         for d,k in enumerate(y_train):
@@ -302,7 +304,7 @@ class TrainDatabaseCVPlusLoo(TrainDatabase):
                 y_star += [max(self.values[thing][i])*torch.ones(525)]
             self.y_star.update({thing:torch.cat(y_star)})
     y_train = y_train if self.sparsity == 0 else y_train[dense_idx]
-    if mode=="bpr":
+    if mode=="bpr" or "tml":
         self.larger_set = []
         self.smaller_set = []
         for d,k in enumerate(y_train):
@@ -376,16 +378,16 @@ class TrainDatabaseLoo(TrainDatabase):
     self.x = {"train":torch.tensor(X_train.astype(np.float32))}
     self.y = {"train":torch.tensor(y_train.astype(np.float32))}
 
-def get_tr_loader(batch_size, data_path, loo, mode,use_meta=True, cv=None, split_type="cv", sparsity = 0):
+def get_tr_loader(batch_size, data_path, loo, mode, use_meta=True, cv=None, split_type="cv", sparsity = 0, output_normalization = True):
     
   if split_type=="cv":
-      dataset = TrainDatabaseCV(data_path, loo,mode=mode)
+      dataset = TrainDatabaseCV(data_path, loo, mode=mode, use_meta=use_meta, output_normalization = output_normalization)
   else:
-      dataset = TrainDatabaseCVPlusLoo(data_path, cv=cv,loo=loo,mode=mode,sparsity = sparsity,use_meta=use_meta)
+      dataset = TrainDatabaseCVPlusLoo(data_path, cv=cv, loo=loo, mode=mode, sparsity=sparsity, use_meta=use_meta)
   loader = DataLoader(dataset=dataset,batch_size=batch_size,shuffle=True)
   unshuffled_loader = DataLoader(dataset=copy.deepcopy(dataset),batch_size=525,shuffle=False)
   unshuffled_loader.dataset.mode="regression"
-  return loader,unshuffled_loader
+  return loader, unshuffled_loader
 
 def get_ts_loader(batch_size, data_path, loo, mu_in,std_in,mu_out,std_out, split_type="cv",use_meta=True):
   dataset = TestDatabase(data_path, loo,mu_in,std_in,mu_out,std_out, split_type=split_type,use_meta=use_meta)
