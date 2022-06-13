@@ -24,7 +24,6 @@ from utils import Log,get_log,save_model
 from loader import get_tr_loader,get_ts_loader
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
-#from torch.utils.tensorboard import SummaryWriter
 
 
 class batch_mlp(nn.Module):
@@ -83,16 +82,6 @@ class ModelRunner:
         self.max_corr_dict = {'rank@1': np.inf, 'epoch': -1, "ndcg@5":-1, "ndcg@10":-1, "ndcg@20":-1}
         cs = self.get_configspace(self.seed)
         config = cs.sample_configuration()
-
-        # Test config (shut down after debugging)
-        '''
-        config['optimizer'] = 'Adam'
-        config['lr'] = 1e-3
-        config['weight_decay'] = 1e-3
-        config['batch_size'] = 64
-        config['num_hidden_layers'] = 3
-        config['num_hidden_units'] = 32
-        '''
 
         self.model = batch_mlp(d_in=42 if self.use_meta else 38, output_sizes=config["num_hidden_layers"]*[config["num_hidden_units"]]+[1], dropout=config["dropout_rate"])
         self.model.to(self.device)
@@ -243,7 +232,7 @@ class ModelRunner:
         trloss = 0
         pbar = self.mtrloader
 
-        running_logits_mean = 0
+        #running_logits_mean = 0
         all_logits = []
         for (x, s, l), (acc,acc_s,acc_l), (r,r_s,r_l) in pbar:
             self.optimizer.zero_grad()
@@ -254,15 +243,6 @@ class ModelRunner:
             # TODO: Normalization
             # 1. Running mean of y_pred
             # 2. Min-max scaling batch/whole
-            
-            '''
-            raw_output = torch.cat([y_pred, y_pred_s, y_pred_l], 0)
-            running_output_mean += raw_output.mean()
-            curr_mean = running_output_mean/(dlen+1)
-            y_pred = y_pred-curr_mean
-            y_pred_s = y_pred_s-curr_mean
-            y_pred_l = y_pred_l-curr_mean
-            '''
 
             output_gr_smaller = nn.Sigmoid()(y_pred - y_pred_s) # batch
             larger_gr_output  = nn.Sigmoid()(y_pred_l - y_pred)
@@ -270,7 +250,7 @@ class ModelRunner:
 
             logits = torch.cat([output_gr_smaller,larger_gr_output,larger_gr_smaller], 0) # concatenates end to end
 
-            all_logits.append(logits.detach().tolist())
+            
             # TODO
             # Print the mean of above
             #print(output_gr_smaller.mean(), larger_gr_output.mean(), larger_gr_smaller.mean())
@@ -279,6 +259,8 @@ class ModelRunner:
             if dlen % 10 == 0:
                 print(running_logits_mean/(dlen+1))
             '''
+
+            all_logits.append(logits.detach().tolist())
 
             if self.fn=="v0":
                 weights = torch.cat([torch.exp(-(acc-acc_s).pow(2)),
@@ -329,7 +311,6 @@ class ModelRunner:
 
             loss = nn.TripletMarginLoss(margin = margin)(y_pred, y_pred_l, y_pred_s)
             
-            nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
             loss.backward()
             self.optimizer.step()
 
@@ -431,8 +412,8 @@ if __name__=="__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--seed', type=int, default=9635)
-    parser.add_argument('--save_path', type=str, default='../ckpts/results_new', help='the path of save directory')
+    parser.add_argument('--seed', type=int, default=2)
+    parser.add_argument('--save_path', type=str, default='../ckpts_weigh_script', help='the path of save directory')
     parser.add_argument('--data_path', type=str, default='../../data', help='the path of save directory')
     parser.add_argument('--mode', type=str, default='bpr', help='training objective',choices=["regression", "bpr", "tml"])
     parser.add_argument('--save_epoch', type=int, default=25, help='how many epochs to wait each time to save model states') 
