@@ -40,8 +40,8 @@ class TestDatabase(Dataset):
         
         testing_cls = [f"{i}-{self.cls[loo]}" for i in range(15)]
     else:
-        cv_folds = pd.read_csv(os.path.join(data_path,"cv_folds.csv"),header=0)
-        testing_cls = list(cv_folds[cv_folds["fold"].isin([loo])]["Unnamed: 0"])
+        cv_folds = pd.read_csv(os.path.join(data_path,"cv_folds.csv"),header=0, index_col = 0)
+        testing_cls = list((cv_folds[cv_folds["fold"].isin([loo])]).index)
     # process input
     predictors  = _list_of_metafeatures+_numerical_hps+_bool_hps+_categorical_hps if use_meta else _numerical_hps+_bool_hps+_categorical_hps
     attributes = data[predictors].copy()
@@ -77,14 +77,13 @@ class TrainDatabase(Dataset):
   def __getitem__(self, index):
        if self.mode == "regression":
            return self.__get_regression_item__(index)
-       else: # instead use elif and check if mode is bpr
+       elif self.mode == "bpr" or self.mode == "tml":
            return self.__get_bpr_item__(index)
 
   def __len__(self):
     return len(self.y[self.training])
 
   def __get_regression_item__(self, index):
-    # ridx = self.idx_lst[self.mode]
     x = self.x[self.training][index]
     y = self.y[self.training][index] 
     ystar  = self.y_star[self.training][index]
@@ -98,16 +97,13 @@ class TrainDatabase(Dataset):
     x = self.x[self.training][index]
     y = self.y[self.training][index]
     r = self.ranks_flat[self.training][index]
-    # ds = self.ds_ref[index]
     
     try:
-        # larger_idx  = self.rng.choice(np.where(np.logical_and(self.y[self.training]>y,self.ds_ref==ds))[0])
         larger_idx  = self.rng.choice(self.larger_set[index])
     except ValueError:
         larger_idx=index
 
     try:
-        # smaller_idx = self.rng.choice(np.where(np.logical_and(self.y[self.training]<y ,self.ds_ref==ds))[0])
         smaller_idx = self.rng.choice(self.smaller_set[index])
     except ValueError:
         smaller_idx = index
@@ -117,30 +113,25 @@ class TrainDatabase(Dataset):
     r_s = self.ranks_flat[self.training][smaller_idx]
     l = ((self.x[self.training][larger_idx]- self.mean_input) / self.std_input)
     r_l = self.ranks_flat[self.training][larger_idx]
+    
     return (x,s,l), (y, self.y[self.training][smaller_idx], self.y[self.training][larger_idx]), (r,r_s,r_l)
     
 class TrainDatabaseCV(TrainDatabase):
-  def __init__(self, data_path, cv, output_normalization=False, input_normalization=True, mode="regression", use_meta=True):
+  def __init__(self, data_path, cv, output_normalization=False, input_normalization=True, mode="regression", sparsity = 0., use_meta=True):
     super(TrainDatabase, self).__init__()
     self.training = "train"
     self.output_normalization = output_normalization
     self.input_normalization = input_normalization
     self.mode = mode
     self.rng = np.random.RandomState(0)
+    self.rng2 = np.random.RandomState(0)
     self.valid_rng = np.random.RandomState(0)
     # read data
     data = pd.read_csv(os.path.join(data_path,"data_m.csv"),header=0)
-    cv_folds = pd.read_csv(os.path.join(data_path,"cv_folds.csv"),header=0)
-    '''
-    cls = list(cv_folds[~cv_folds["fold"].isin([cv])]["Unnamed: 0"].apply(lambda x: x.split("-")[1]).unique()) # CV fold 1, training 2,3,4,5
-    valid_cls_names = self.valid_rng.choice(cls,replace=False,size=3)
-    valid_cls = []
-    for v in valid_cls_names:
-        for i in range(15):
-            valid_cls.append(f"{i}-{v}")
-    '''
-    valid_cls = list(cv_folds[cv_folds["fold"].isin([cv])]["Unnamed: 0"])
-    training_cls = list(cv_folds[~cv_folds["fold"].isin([cv])]["Unnamed: 0"])
+    cv_folds = pd.read_csv(os.path.join(data_path,"cv_folds.csv"), header=0, index_col = 0)
+
+    valid_cls = list(cv_folds[cv_folds["fold"].isin([cv])].index)
+    training_cls = list(cv_folds[~cv_folds["fold"].isin([cv])].index)
 
     # process input
     predictors  = _list_of_metafeatures+_numerical_hps+_bool_hps+_categorical_hps if use_meta else _numerical_hps+_bool_hps+_categorical_hps
@@ -150,7 +141,17 @@ class TrainDatabaseCV(TrainDatabase):
         attributes[alog] = attributes[alog].apply(lambda x: np.log(x))
     self.attributes = attributes
     X_train = np.array(attributes[data.dataset.isin(training_cls)])
+
+    '''
+    if self.sparsity>0:
+        dense_idx = self.rng2.choice(X_train.shape[0],int((1-self.sparsity)*X_train.shape[0]),replace=False)
+        dense_idx.sort()
+        self.dense_idx = dense_idx
+        X_train = X_train[dense_idx]
+    '''
+    
     X_valid = np.array(attributes[data.dataset.isin(valid_cls)])
+
     if input_normalization: # use sklearn or smth
         self.std_input = np.concatenate([np.std(X_train[:,:-len(_bool_hps+_categorical_hps)], 0), np.ones(len(_bool_hps+_categorical_hps))]).astype(np.float32)
         self.std_input[self.std_input == 0 ] = 1 # Why correct division by zero errors like this
@@ -192,12 +193,15 @@ class TrainDatabaseCV(TrainDatabase):
     self.ranks_flat["train"] = rank_train/max(rank_train) 
     self.y_star = {"train":[],"valid": []}
     self.ds_ref = np.concatenate([525*[i] for i in range(len(self.y["train"])//525)])
-    for thing in ["train","valid"]:
-        ndatasets = len(self.y[thing])//525
+
+
+
+    for _set in ["train","valid"]:
+        ndatasets = len(self.y[_set])//525
         y_star = []
         for i in range(ndatasets):
-            y_star += [max(self.values[thing][i])*torch.ones(525)]
-        self.y_star.update({thing:torch.cat(y_star)})
+            y_star += [max(self.values[_set][i])*torch.ones(525)]
+        self.y_star.update({_set:torch.cat(y_star)})
     if mode=="bpr" or mode=="tml":
         self.larger_set = []
         self.smaller_set = []
@@ -220,7 +224,7 @@ class TrainDatabaseCVPlusLoo(TrainDatabase):
     self.valid_rng = np.random.RandomState(0)
     # read data
     data = pd.read_csv(os.path.join(data_path,"data_m.csv"),header=0)
-    cv_folds = pd.read_csv(os.path.join(data_path,"cv_folds.csv"),header=0)
+    cv_folds = pd.read_csv(os.path.join(data_path,"cv_folds.csv"), header=0, index_col = 0)
     with open(os.path.join(data_path,"cls_names.pkl"),"rb") as f:
         self.cls = pickle.load(f)
     # get training/test split 
@@ -228,8 +232,8 @@ class TrainDatabaseCVPlusLoo(TrainDatabase):
     exclude_cls = []
     for aug in range(15):
         exclude_cls.append(f"{aug}-{exclude_cls_original}")
-    valid_cls = np.setdiff1d(list(cv_folds[cv_folds["fold"].isin([cv])]["Unnamed: 0"]),exclude_cls).tolist()
-    training_cls = np.setdiff1d(list(cv_folds[~cv_folds["fold"].isin([cv])]["Unnamed: 0"]),exclude_cls).tolist()
+    valid_cls = np.setdiff1d(list(cv_folds[cv_folds["fold"].isin([cv])].index),exclude_cls).tolist()
+    training_cls = np.setdiff1d(list(cv_folds[~cv_folds["fold"].isin([cv])].index),exclude_cls).tolist()
     # process input
     predictors  = _list_of_metafeatures+_numerical_hps+_bool_hps+_categorical_hps if use_meta else _numerical_hps+_bool_hps+_categorical_hps
     attributes = data[predictors].copy()
@@ -244,6 +248,7 @@ class TrainDatabaseCVPlusLoo(TrainDatabase):
         dense_idx.sort()
         self.dense_idx = dense_idx
         X_train = X_train[dense_idx]
+
     X_valid = np.array(attributes[data.dataset.isin(valid_cls)])
     
     if input_normalization:
@@ -316,6 +321,7 @@ class TrainDatabaseCVPlusLoo(TrainDatabase):
                 y_star += [max(self.values[thing][i])*torch.ones(525)]
             self.y_star.update({thing:torch.cat(y_star)})
     y_train = y_train if self.sparsity == 0 else y_train[dense_idx]
+    
     if mode=="bpr" or "tml":
         self.larger_set = []
         self.smaller_set = []
@@ -356,7 +362,6 @@ class TrainDatabaseLoo(TrainDatabase):
     for cls_idx in training_cls_idx:
         for aug in range(15):
             training_cls.append(f"{aug}-{self.cls[cls_idx]}")
-    # testing_cls = [f"0-{self.cls[loo]}"]
     
     # process input
     attributes = data[_list_of_metafeatures+_numerical_hps+_bool_hps+_categorical_hps]
@@ -396,12 +401,12 @@ def get_tr_loader(batch_size, data_path, loo, mode, use_meta=True, cv=None, spli
       dataset = TrainDatabaseCV(data_path, cv, mode=mode, use_meta=use_meta, output_normalization = output_normalization)
   else:
       dataset = TrainDatabaseCVPlusLoo(data_path, cv=cv, loo=loo, mode=mode, sparsity=sparsity, use_meta=use_meta)
-  loader = DataLoader(dataset=dataset,batch_size=batch_size,shuffle=True)
-  unshuffled_loader = DataLoader(dataset=copy.deepcopy(dataset),batch_size=525,shuffle=False)
+  loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
+  unshuffled_loader = DataLoader(dataset=copy.deepcopy(dataset), batch_size=525, shuffle=False)
   unshuffled_loader.dataset.mode="regression"
   return loader, unshuffled_loader
 
-def get_ts_loader(batch_size, data_path, loo, mu_in,std_in,mu_out,std_out, split_type="loo", use_meta=True):
+def get_ts_loader(batch_size, data_path, loo, mu_in, std_in, mu_out, std_out, split_type="loo", use_meta=True):
   dataset = TestDatabase(data_path, loo, mu_in, std_in, mu_out, std_out, split_type=split_type, use_meta=use_meta)
   loader = DataLoader(dataset=dataset,batch_size=batch_size,shuffle=False)
   return loader    
