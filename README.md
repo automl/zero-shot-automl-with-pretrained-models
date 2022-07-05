@@ -3,13 +3,13 @@
 
 Given a new dataset D and a low compute budget, how should we choose a pre-trained model to fine-tune to D, and set the fine-tuning hyperparameters without risking overfitting, particularly if D is small? Here, we extend automated machine learning (AutoML) to best make these choices. Our domain-independent meta-learning approach learns a zero-shot surrogate model which, at test time, allows to select the right deep learning (DL) pipeline (including the pre-trained model and fine-tuning hyperparameters) for a new dataset D given only trivial meta-features describing D such as image resolution or the number of classes. To train this zero-shot model, we collect performance data for many DL pipelines on a large collection of datasets and meta-train on this data to minimize a pairwise ranking objective. We evaluate our approach under the strict time limit on the vision track of the ChaLearn AutoDL challenge benchmark, clearly outperforming all challenge contenders.
 
-Paper link: tba
+Paper: https://arxiv.org/abs/2206.08476
 
 # Download Models and Meta-Dataset
 Our data can be downloaded under the following links:
 * Datasets (~196G): https://bit.ly/3B1zvl0
 * Models (~700M): https://bit.ly/3BhIAGB
-* Meta-dataset: https://bit.ly/3NnhP8W 
+* Meta-dataset (~2.5M): https://bit.ly/3NnhP8W 
 
 and should be placed under `.data/datasets`, `.data/models`, `.data/meta_dataset`. 
 
