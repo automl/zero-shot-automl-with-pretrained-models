@@ -123,6 +123,7 @@ class TrainDatabaseCV(TrainDatabase):
     self.output_normalization = output_normalization
     self.input_normalization = input_normalization
     self.mode = mode
+    self.sparsity = sparsity
     self.rng = np.random.RandomState(0)
     self.rng2 = np.random.RandomState(0)
     self.valid_rng = np.random.RandomState(0)
@@ -142,14 +143,14 @@ class TrainDatabaseCV(TrainDatabase):
     self.attributes = attributes
     X_train = np.array(attributes[data.dataset.isin(training_cls)])
 
-    '''
+    
     if self.sparsity>0:
         dense_idx = self.rng2.choice(X_train.shape[0],int((1-self.sparsity)*X_train.shape[0]),replace=False)
         dense_idx.sort()
         self.dense_idx = dense_idx
         X_train = X_train[dense_idx]
-    '''
     
+
     X_valid = np.array(attributes[data.dataset.isin(valid_cls)])
 
     if input_normalization: # use sklearn or smth
@@ -194,22 +195,50 @@ class TrainDatabaseCV(TrainDatabase):
     self.y_star = {"train":[],"valid": []}
     self.ds_ref = np.concatenate([525*[i] for i in range(len(self.y["train"])//525)])
 
+    if self.sparsity > 0:
+        self.ds_ref = self.ds_ref[dense_idx]    
 
-
-    for _set in ["train","valid"]:
-        ndatasets = len(self.y[_set])//525
+        values_sparse = []
+        y_star_sparse = []
+        ranks_sparse = []
+        ranks_flat = []
+        for ds in np.unique(self.ds_ref):
+            ds_y =  self.y["train"][dense_idx][np.where(self.ds_ref==ds)[0]]
+            values_sparse.append(ds_y)
+            y_star_sparse += [max(values_sparse[-1])*torch.ones(len(values_sparse[-1]))]
+            orde      = list(np.sort(np.unique(ds_y))[::-1])
+            new_ranks = list(map(lambda x: orde.index(x),ds_y))
+            ranks_sparse.append(new_ranks)                
+            ranks_flat+=(np.array(new_ranks)/max(new_ranks)).tolist()
+        self.y_star.update({"train":torch.cat(y_star_sparse)})                
+        self.values.update({"train":values_sparse})                
+        self.ranks.update({"train":ranks_sparse})
+        self.y.update({"train":self.y["train"][dense_idx]})
+        self.ranks_flat.update({"train":ranks_flat})
+    
+        # values, ranks and y stay the same
+        ndatasets = len(self.y["valid"])//525
         y_star = []
         for i in range(ndatasets):
-            y_star += [max(self.values[_set][i])*torch.ones(525)]
-        self.y_star.update({_set:torch.cat(y_star)})
-    if mode=="bpr" or mode=="tml":
-        self.larger_set = []
-        self.smaller_set = []
-        for d,k in enumerate(y_train):
-            ll = np.where(np.logical_and(y_train>k,self.ds_ref==self.ds_ref[d]))[0]
-            ss = np.where(np.logical_and(y_train<k,self.ds_ref==self.ds_ref[d]))[0]
-            self.larger_set.append(ll)
-            self.smaller_set.append(ss)
+            y_star += [max(self.values["valid"][i])*torch.ones(525)]
+        self.y_star.update({"valid":torch.cat(y_star)})        
+
+    else:
+
+        for _set in ["train","valid"]:
+            ndatasets = len(self.y[_set])//525
+            y_star = []
+            for i in range(ndatasets):
+                y_star += [max(self.values[_set][i])*torch.ones(525)]
+            self.y_star.update({_set:torch.cat(y_star)})
+        if mode=="bpr" or mode=="tml":
+            self.larger_set = []
+            self.smaller_set = []
+            for d,k in enumerate(y_train):
+                ll = np.where(np.logical_and(y_train>k,self.ds_ref==self.ds_ref[d]))[0]
+                ss = np.where(np.logical_and(y_train<k,self.ds_ref==self.ds_ref[d]))[0]
+                self.larger_set.append(ll)
+                self.smaller_set.append(ss)
     
 class TrainDatabaseCVPlusLoo(TrainDatabase):
   def __init__(self, data_path, loo, cv, output_normalization=False, input_normalization=True, mode="regression", sparsity = 0., use_meta=True):
@@ -288,38 +317,39 @@ class TrainDatabaseCVPlusLoo(TrainDatabase):
     
     if self.sparsity > 0:
         self.ds_ref = self.ds_ref[dense_idx]    
-        for thing in ["train"]:
-            values_sparse = []
-            y_star_sparse = []
-            ranks_sparse = []
-            ranks_flat = []
-            for ds in np.unique(self.ds_ref):
-                ds_y =  self.y[thing][dense_idx][np.where(self.ds_ref==ds)[0]]
-                values_sparse.append(ds_y)
-                y_star_sparse += [max(values_sparse[-1])*torch.ones(len(values_sparse[-1]))]
-                orde      = list(np.sort(np.unique(ds_y))[::-1])
-                new_ranks = list(map(lambda x: orde.index(x),ds_y))
-                ranks_sparse.append(new_ranks)                
-                ranks_flat+=(np.array(new_ranks)/max(new_ranks)).tolist()
-            self.y_star.update({thing:torch.cat(y_star_sparse)})                
-            self.values.update({thing:values_sparse})                
-            self.ranks.update({thing:ranks_sparse})
-            self.y.update({thing:self.y[thing][dense_idx]})
-            self.ranks_flat.update({thing:ranks_flat})
-        for thing in ["valid"]:
-            # values, ranks and y stay the same
-            ndatasets = len(self.y[thing])//525
-            y_star = []
-            for i in range(ndatasets):
-                y_star += [max(self.values[thing][i])*torch.ones(525)]
-            self.y_star.update({thing:torch.cat(y_star)})            
+
+        values_sparse = []
+        y_star_sparse = []
+        ranks_sparse = []
+        ranks_flat = []
+        for ds in np.unique(self.ds_ref):
+            ds_y =  self.y["train"][dense_idx][np.where(self.ds_ref==ds)[0]]
+            values_sparse.append(ds_y)
+            y_star_sparse += [max(values_sparse[-1])*torch.ones(len(values_sparse[-1]))]
+            orde      = list(np.sort(np.unique(ds_y))[::-1])
+            new_ranks = list(map(lambda x: orde.index(x),ds_y))
+            ranks_sparse.append(new_ranks)                
+            ranks_flat+=(np.array(new_ranks)/max(new_ranks)).tolist()
+        self.y_star.update({"train":torch.cat(y_star_sparse)})                
+        self.values.update({"train":values_sparse})                
+        self.ranks.update({"train":ranks_sparse})
+        self.y.update({"train":self.y["train"][dense_idx]})
+        self.ranks_flat.update({"train":ranks_flat})
+
+        # values, ranks and y stay the same
+        ndatasets = len(self.y["valid"])//525
+        y_star = []
+        for i in range(ndatasets):
+            y_star += [max(self.values["valid"][i])*torch.ones(525)]
+        self.y_star.update({"valid":torch.cat(y_star)})            
     else:
-        for thing in ["train","valid"]:
-            ndatasets = len(self.y[thing])//525
+        for _set in ["train","valid"]:
+            ndatasets = len(self.y[_set])//525
             y_star = []
             for i in range(ndatasets):
-                y_star += [max(self.values[thing][i])*torch.ones(525)]
-            self.y_star.update({thing:torch.cat(y_star)})
+                y_star += [max(self.values[_set][i])*torch.ones(525)]
+            self.y_star.update({_set:torch.cat(y_star)})
+
     y_train = y_train if self.sparsity == 0 else y_train[dense_idx]
     
     if mode=="bpr" or "tml":
