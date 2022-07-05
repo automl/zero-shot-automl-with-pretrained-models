@@ -123,16 +123,11 @@ class TrainDatabaseCV(TrainDatabase):
     self.output_normalization = output_normalization
     self.input_normalization = input_normalization
     self.mode = mode
-<<<<<<< HEAD
     self.sparsity = sparsity
-    self.rng = np.random.RandomState(0)
-    self.rng2 = np.random.RandomState(0)
-    self.valid_rng = np.random.RandomState(0)
-=======
     self.rng = np.random.default_rng(0)
     self.rng2 = np.random.default_rng(0)
     self.valid_rng = np.random.default_rng(0)
->>>>>>> 640f1fdc0f4f4815c77b4d9a6cc95cf391b2df26
+
     # read data
     data = pd.read_csv(os.path.join(data_path,"data_m.csv"),header=0)
     cv_folds = pd.read_csv(os.path.join(data_path,"cv_folds.csv"), header=0, index_col = 0)
