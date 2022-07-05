@@ -73,8 +73,6 @@ class ModelRunner:
         else:
             self.optimizer = torch.optim.SGD(self.model.parameters(), lr=config['lr'], momentum=config['sgd_momentum'])        
         
-        #self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.max_epoch, eta_min=1e-6)
-
         self.criterion = nn.MSELoss()
         
         self.mtrloader,self.mtrloader_unshuffled =  get_tr_loader(self.batch_size, self.data_path, loo=self.loo, cv=self.cv,
@@ -114,8 +112,6 @@ class ModelRunner:
                 loss = self.train_bpr_epoch(epoch)
             elif self.mode=="tml":
                 loss = self.train_tml_epoch(epoch)
-
-            #self.scheduler.step()
 
             self.mtrlog.print_pred_log(loss, 0, 'train', epoch=epoch)
             vacorr, vaccc, vandcg = self.validation(epoch, "valid")

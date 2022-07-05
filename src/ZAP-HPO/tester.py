@@ -35,7 +35,7 @@ class ModelTester:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         cs = self.get_configspace(self.seed)
         config = cs.sample_configuration()
-        self.model = batch_mlp(d_in=39 if self.use_meta else 36,output_sizes=config["num_hidden_layers"]*[config["num_hidden_units"]]+[1],
+        self.model = batch_mlp(d_in=39 if self.use_meta else 35,output_sizes=config["num_hidden_layers"]*[config["num_hidden_units"]]+[1],
                                dropout=config["dropout_rate"])
         self.model.to(self.device)
         extra = f"-{self.sparsity}" if self.sparsity > 0 else ""

@@ -8,6 +8,7 @@ Created on Tue Dec  7 13:36:19 2021
 import time
 import torch
 import os
+
 class Log:
 	def __init__(self, args, logf, summary=None):
 		self.args = args

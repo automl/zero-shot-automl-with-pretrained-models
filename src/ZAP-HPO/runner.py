@@ -17,6 +17,7 @@ except:
 from sklearn.metrics import ndcg_score
 import os
 import json
+import pickle
 import numpy as np
 import time
 from tqdm import tqdm
@@ -37,10 +38,6 @@ class batch_mlp(nn.Module):
         self.fc = nn.ModuleList([nn.Linear(in_features=d_in, out_features=output_sizes[0])])
         for d_out in output_sizes[1:]:
             self.fc.append(nn.Linear(in_features=self.fc[-1].out_features, out_features=d_out))
-        
-        self.bn = nn.ModuleList([])
-        for d_out in output_sizes[:-1]:
-            self.bn.append(nn.BatchNorm1d(num_features=d_out))
 
         self.dropout = nn.Dropout(dropout)
 
@@ -48,9 +45,8 @@ class batch_mlp(nn.Module):
     
     def forward(self,x):
         
-        for fc, bn in zip(self.fc[:-1], self.bn):
+        for fc in self.fc[:-1]:
             x = fc(x)
-            x = bn(x)
             x = self.dropout(x)
             x = self.nonlinearity(x)
         x = self.fc[-1](x)
@@ -83,14 +79,17 @@ class ModelRunner:
         cs = self.get_configspace(self.seed)
         config = cs.sample_configuration()
 
-        self.model = batch_mlp(d_in=42 if self.use_meta else 38, output_sizes=config["num_hidden_layers"]*[config["num_hidden_units"]]+[1], dropout=config["dropout_rate"])
+        self.model = batch_mlp(d_in=39 if self.use_meta else 35, output_sizes=config["num_hidden_layers"]*[config["num_hidden_units"]]+[1], dropout=config["dropout_rate"])
         self.model.to(self.device)
+        
         if config['optimizer'] == 'Adam':
             self.optimizer = torch.optim.Adam(self.model.parameters(), lr=config['lr'], weight_decay = config['weight_decay'])
         elif config['optimizer'] == 'AdamW':
             self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=config['lr'], weight_decay = config['weight_decay'])
-        else:
+        elif config['optimizer'] == 'SGD':
             self.optimizer = torch.optim.SGD(self.model.parameters(), lr=config['lr'], momentum=config['sgd_momentum'], weight_decay = config['weight_decay'])
+
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.max_epoch, eta_min= config["min_lr"])
 
         self.mtrloader,self.mtrloader_unshuffled =  get_tr_loader(config['batch_size'], self.data_path, loo=self.loo, cv=self.cv,
                                         mode=self.mode,split_type=args.split_type,sparsity =self.sparsity,
@@ -118,39 +117,30 @@ class ModelRunner:
         
         os.makedirs(self.model_path,exist_ok=True)
         self.mtrlog = Log(self.args, open(os.path.join(self.model_path, 'meta_train_predictor.log'), 'w'))
-        self.mtrlog.print_args(config)
-        #self.setup_writers()
-        
-    def setup_writers(self,):
-        train_log_dir = os.path.join(self.model_path,"train")
-        os.makedirs(train_log_dir,exist_ok=True)
-        self.train_summary_writer = SummaryWriter(train_log_dir)
-        
-        valid_log_dir = os.path.join(self.model_path,"valid")
-        os.makedirs(valid_log_dir,exist_ok=True)
-        self.valid_summary_writer = SummaryWriter(valid_log_dir)     
-        
-        test_log_dir = os.path.join(self.model_path,"test")
-        os.makedirs(test_log_dir,exist_ok=True)
-        self.test_summary_writer = SummaryWriter(test_log_dir)       
+        self.mtrlog.print_args(config)    
+
+        norm_dict = {'mean': self.mtrloader.dataset.mean_input, 'std': self.mtrloader.dataset.std_input}
+
+        norm_path = os.path.join(self.model_path, "norm.pt")      
+        with open(norm_path, 'wb') as f:
+            pickle.dump(norm_dict, f) 
     
     def train(self):
         history = {"trndcg": [], "vandcg": []}
         patience = 0
-        all_logits = dict()
         for epoch in range(1, self.max_epoch + 1):
             self.mtrlog.ep_sttime = time.time()
             if self.mode=="regression":
                 loss = self.train_epoch(epoch)  
             elif self.mode=="bpr":
-                loss, logits = self.train_bpr_epoch(epoch)
-                all_logits[epoch] = logits
+                loss = self.train_bpr_epoch(epoch)
             elif self.mode=="tml":
                 loss = self.train_tml_epoch(epoch)
 
             patience += 1
 
-            # self.scheduler.step(loss)
+            self.scheduler.step()
+
             self.mtrlog.print_pred_log(loss, 0, 'train', epoch=epoch)
             vacorr, vaccc, vandcg = self.validation(epoch, "valid")
             trcorr, tracc, trndcg = self.validation(epoch, "train")
@@ -165,8 +155,8 @@ class ModelRunner:
                 self.max_corr_dict.update(vandcg)
                 save_model(epoch, self.model, self.model_path, max_corr=True)
                 
-            if patience >= 25:
-                break
+            #if patience >= 25:
+             #   break
 
             self.mtrlog.print_pred_log(0, vacorr, 'valid', ndcg=vandcg, max_corr_dict=self.max_corr_dict)
             
@@ -189,11 +179,6 @@ class ModelRunner:
             with open(history_path, 'w') as f:
                 json.dump(history, f)  
 
-            logits_path = os.path.join(self.model_path, "logits.json")      
-            with open(logits_path, 'w') as f:
-                json.dump(all_logits, f) 
-
-
         self.mtrlog.save_time_log()
 
         return history
@@ -214,7 +199,6 @@ class ModelRunner:
             else:
               loss = WMSE(y_pred,y.unsqueeze(-1),weights=torch.exp(-(acc-y_).pow(2)).unsqueeze(-1))
 
-            nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
             loss.backward()
             self.optimizer.step()
     
@@ -232,17 +216,12 @@ class ModelRunner:
         trloss = 0
         pbar = self.mtrloader
 
-        #running_logits_mean = 0
-        all_logits = []
         for (x, s, l), (acc,acc_s,acc_l), (r,r_s,r_l) in pbar:
             self.optimizer.zero_grad()
-            y_pred = self.model.forward(x) # perf prediction
+            y_pred = self.model.forward(x)
             y_pred_s = self.model.forward(s)
             y_pred_l = self.model.forward(l) 
 
-            # TODO: Normalization
-            # 1. Running mean of y_pred
-            # 2. Min-max scaling batch/whole
 
             output_gr_smaller = nn.Sigmoid()(y_pred - y_pred_s) # batch
             larger_gr_output  = nn.Sigmoid()(y_pred_l - y_pred)
@@ -250,48 +229,35 @@ class ModelRunner:
 
             logits = torch.cat([output_gr_smaller,larger_gr_output,larger_gr_smaller], 0) # concatenates end to end
 
-            
-            # TODO
-            # Print the mean of above
-            #print(output_gr_smaller.mean(), larger_gr_output.mean(), larger_gr_smaller.mean())
-            '''
-            running_logits_mean += logits.mean()
-            if dlen % 10 == 0:
-                print(running_logits_mean/(dlen+1))
-            '''
-
-            all_logits.append(logits.detach().tolist())
-
-            if self.fn=="v0":
-                weights = torch.cat([torch.exp(-(acc-acc_s).pow(2)),
-                                    torch.exp(-(acc_l-acc).pow(2)),
-                                    torch.exp(-(acc_l-acc_s).pow(2))],0)
-            elif self.fn=="v1":
-                weights = torch.cat([(acc-acc_s).pow(2),
-                                    (acc_l-acc).pow(2),
-                                    (acc_l-acc_s).pow(2)],0)
-            elif self.fn=="v0-rank":
-                weights = torch.cat([torch.exp(-((r-r_s)).pow(2)),
-                                    torch.exp(-((r_l-r)).pow(2)),
-                                    torch.exp(-((r_l-r_s)).pow(2))],0)
-            elif self.fn=="v1-rank":
-                weights = torch.cat([((r-r_s)).pow(2),
-                                    ((r_l-r)).pow(2),
-                                    ((r_l-r_s)).pow(2)],0)
-
             if self.weighted:
+                if self.fn=="v0":
+                    weights = torch.cat([torch.exp(-(acc-acc_s).pow(2)),
+                                        torch.exp(-(acc_l-acc).pow(2)),
+                                        torch.exp(-(acc_l-acc_s).pow(2))],0)
+                elif self.fn=="v1":
+                    weights = torch.cat([(acc-acc_s).pow(2),
+                                        (acc_l-acc).pow(2),
+                                        (acc_l-acc_s).pow(2)],0)
+                elif self.fn=="v0-rank":
+                    weights = torch.cat([torch.exp(-((r-r_s)).pow(2)),
+                                        torch.exp(-((r_l-r)).pow(2)),
+                                        torch.exp(-((r_l-r_s)).pow(2))],0)
+                elif self.fn=="v1-rank":
+                    weights = torch.cat([((r-r_s)).pow(2),
+                                        ((r_l-r)).pow(2),
+                                        ((r_l-r_s)).pow(2)],0)
+
                 loss = nn.BCELoss(weight=weights.unsqueeze(-1))(logits, torch.ones_like(logits))    
             else:
                 loss = nn.BCELoss()(logits, torch.ones_like(logits))
 
-            nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
             loss.backward()
             self.optimizer.step()
 
             trloss += float(loss)
             dlen+=1
 
-        return trloss/dlen, all_logits
+        return trloss/dlen
 
     def train_tml_epoch(self, epoch, margin = 1.0):
         self.model.to(self.device)
@@ -388,20 +354,21 @@ class ModelRunner:
         
         cs = CS.ConfigurationSpace(seed=seed)
         
-        lr = CSH.UniformFloatHyperparameter('lr', lower=1e-5, upper=1e-2, default_value=1e-3, log=True)
+        lr = CSH.UniformFloatHyperparameter('lr', lower=1e-6, upper=1e-2, log=True)
+        min_lr = CSH.UniformFloatHyperparameter('min_lr', lower=1e-10, upper=1e-6, log=True)
         optimizer = CSH.CategoricalHyperparameter('optimizer', ['Adam', 'SGD', 'AdamW']) # added SGD AdamW
-        weight_decay = CSH.UniformFloatHyperparameter('weight_decay', lower=1e-5, upper=1e-2, default_value=1e-3, log=True) # added
+        weight_decay = CSH.UniformFloatHyperparameter('weight_decay', lower=1e-6, upper=1e-2, log=True) # added
         batch_size = CSH.UniformIntegerHyperparameter('batch_size', lower=8, upper=128, default_value=64) # added
-        cs.add_hyperparameters([lr, optimizer, weight_decay, batch_size])
+        cs.add_hyperparameters([lr, min_lr, optimizer, weight_decay, batch_size])
         
-        num_hidden_layers =  CSH.UniformIntegerHyperparameter('num_hidden_layers', lower=3, upper=15, default_value=5) # 10 -> 15
-        num_hidden_units = CSH.UniformIntegerHyperparameter('num_hidden_units', lower=32, upper=512, default_value=64) # same
+        num_hidden_layers =  CSH.UniformIntegerHyperparameter('num_hidden_layers', lower=2, upper=10)
+        num_hidden_units = CSH.UniformIntegerHyperparameter('num_hidden_units', lower=32, upper=512) # same
         cs.add_hyperparameters([num_hidden_layers, num_hidden_units])
         
-        dropout_rate = CSH.UniformFloatHyperparameter('dropout_rate', lower=0.0, upper=0.9, default_value=0.5, log=False)
+        dropout_rate = CSH.UniformFloatHyperparameter('dropout_rate', lower=0.0, upper=0.9, log=False)
         cs.add_hyperparameters([dropout_rate])
         
-        sgd_momentum = CSH.UniformFloatHyperparameter('sgd_momentum', lower=0.0, upper=0.99, default_value=0.9, log=False) # added for SGD
+        sgd_momentum = CSH.UniformFloatHyperparameter('sgd_momentum', lower=0.0, upper=0.99, log=False) # added for SGD
         cs.add_hyperparameters([sgd_momentum])
         momentum_cond = CS.EqualsCondition(sgd_momentum, optimizer, 'SGD')
         cs.add_conditions([momentum_cond])
@@ -413,11 +380,11 @@ if __name__=="__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=2)
-    parser.add_argument('--save_path', type=str, default='../ckpts_weigh_script', help='the path of save directory')
+    parser.add_argument('--save_path', type=str, default='../ckpts_norm', help='the path of save directory')
     parser.add_argument('--data_path', type=str, default='../../data', help='the path of save directory')
     parser.add_argument('--mode', type=str, default='bpr', help='training objective',choices=["regression", "bpr", "tml"])
-    parser.add_argument('--save_epoch', type=int, default=25, help='how many epochs to wait each time to save model states') 
-    parser.add_argument('--max_epoch', type=int, default=250, help='number of epochs to train')
+    parser.add_argument('--save_epoch', type=int, default=20, help='how many epochs to wait each time to save model states') 
+    parser.add_argument('--max_epoch', type=int, default=400, help='number of epochs to train')
     parser.add_argument('--loo', type=int, default=1, help='Index of dataset [0,34] that should be removed')
     parser.add_argument('--cv', type=int, default=1, help='Index of CV [1,5]')
     parser.add_argument('--split_type', type=str, default="cv", help='cv|loo')
