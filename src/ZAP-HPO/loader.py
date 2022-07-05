@@ -123,9 +123,9 @@ class TrainDatabaseCV(TrainDatabase):
     self.output_normalization = output_normalization
     self.input_normalization = input_normalization
     self.mode = mode
-    self.rng = np.random.RandomState(0)
-    self.rng2 = np.random.RandomState(0)
-    self.valid_rng = np.random.RandomState(0)
+    self.rng = np.random.default_rng(0)
+    self.rng2 = np.random.default_rng(0)
+    self.valid_rng = np.random.default_rng(0)
     # read data
     data = pd.read_csv(os.path.join(data_path,"data_m.csv"),header=0)
     cv_folds = pd.read_csv(os.path.join(data_path,"cv_folds.csv"), header=0, index_col = 0)
@@ -219,9 +219,9 @@ class TrainDatabaseCVPlusLoo(TrainDatabase):
     self.input_normalization = input_normalization
     self.mode = mode
     self.sparsity = sparsity
-    self.rng = np.random.RandomState(0) # deprecated
-    self.rng2 = np.random.RandomState(0)
-    self.valid_rng = np.random.RandomState(0)
+    self.rng = np.random.default_rng(0)
+    self.rng2 = np.random.default_rng(0)
+    self.valid_rng = np.random.default_rng(0)
     # read data
     data = pd.read_csv(os.path.join(data_path,"data_m.csv"),header=0)
     cv_folds = pd.read_csv(os.path.join(data_path,"cv_folds.csv"), header=0, index_col = 0)
@@ -350,7 +350,7 @@ class TrainDatabaseLoo(TrainDatabase):
     self.output_normalization = output_normalization
     self.input_normalization = input_normalization
     self.mode = mode
-    self.rng = np.random.RandomState(0)
+    self.rng = np.random.default_rng(0)
     # read data
     data =pd.read_csv(os.path.join(data_path,"data_m.csv"),header=0)
     with open(os.path.join(data_path,"cls_names.pkl"),"rb") as f:
