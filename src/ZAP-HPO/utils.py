@@ -8,6 +8,7 @@ Created on Tue Dec  7 13:36:19 2021
 import time
 import torch
 import os
+import yaml
 
 class Log:
 	def __init__(self, args, logf, summary=None):
@@ -97,4 +98,10 @@ def get_log(epoch, loss, acc=None, ndcg5=None, ndcg10=None, ndcg20=None, tag='tr
     	msg = f'[{tag}] Ep {epoch} loss {loss.item():0.4f} '
     else:
         msg = f'[{comment}] Ep {epoch} Top-1 Rank {loss} Top-1 Acc {acc} NDCG@5 {ndcg5:.4f} NDCG@10 {ndcg10:.4f} NDCG@20 {ndcg20:.4f}'    
-    return msg        
+    return msg
+
+
+def config_from_yaml(config_path):
+	with open(config_path, 'r') as stream:
+		config = yaml.safe_load(stream)
+	return config

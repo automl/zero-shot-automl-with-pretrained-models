@@ -1,0 +1,8 @@
+'batch_size': 60
+'dropout_rate': 0.0233336086451022
+'lr': 0.0001579973895360496
+'min_lr': 5.511750757691422e-09
+'num_hidden_layers': 5
+'num_hidden_units': 190
+'optimizer': 'Adam'
+'weight_decay': 0.0002999741734865515

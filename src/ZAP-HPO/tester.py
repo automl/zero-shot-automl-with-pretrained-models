@@ -18,7 +18,7 @@ from loader import get_tr_loader,get_ts_loader
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 from runner import batch_mlp
-from utils import load_model
+from utils import load_model, config_from_yaml
 
 class ModelTester:
     def __init__(self,args):
@@ -33,8 +33,12 @@ class ModelTester:
         self.use_meta = args.use_meta
         self.save_path = args.save_path
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        cs = self.get_configspace(self.seed)
-        config = cs.sample_configuration()
+        if args.config_path is None:
+            cs = self.get_configspace(self.seed)
+            config = cs.sample_configuration()
+        else:
+            config = config_from_yaml(args.config_path)
+
         self.model = batch_mlp(d_in=39 if self.use_meta else 35,output_sizes=config["num_hidden_layers"]*[config["num_hidden_units"]]+[1],
                                dropout=config["dropout_rate"])
         self.model.to(self.device)
@@ -96,7 +100,9 @@ if __name__=="__main__":
     parser.add_argument('--cv', type=int, default=1, help='Index of CV [1,5]')
     parser.add_argument('--split_type', type=str, default="loo", help='cv|loo')
     parser.add_argument('--sparsity', type=float, default=0.)
-    parser.add_argument('--use-meta', type=str, default="True", choices=["True","False"])    
+    parser.add_argument('--use-meta', type=str, default="True", choices=["True","False"])
+    parser.add_argument('--config_path',type=str,
+                        help= 'Path to config stored in yaml file. No value implies the CS will be sampled')
     args = parser.parse_args()
     args.use_meta = eval(args.use_meta)
     args.load_model = eval(args.load_model)

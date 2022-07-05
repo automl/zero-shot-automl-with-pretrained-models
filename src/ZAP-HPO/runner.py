@@ -21,7 +21,7 @@ import pickle
 import numpy as np
 import time
 from tqdm import tqdm
-from utils import Log,get_log,save_model
+from utils import Log,get_log,save_model, config_from_yaml
 from loader import get_tr_loader,get_ts_loader
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
@@ -76,8 +76,12 @@ class ModelRunner:
         self.output_normalization = args.output_normalization
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.max_corr_dict = {'rank@1': np.inf, 'epoch': -1, "ndcg@5":-1, "ndcg@10":-1, "ndcg@20":-1}
-        cs = self.get_configspace(self.seed)
-        config = cs.sample_configuration()
+        # check for args.config_path
+        if args.config_path is None:
+            cs = self.get_configspace(self.seed)
+            config = cs.sample_configuration()
+        else:
+            config = config_from_yaml(args.config_path)
 
         self.model = batch_mlp(d_in=39 if self.use_meta else 35, output_sizes=config["num_hidden_layers"]*[config["num_hidden_units"]]+[1], dropout=config["dropout_rate"])
         self.model.to(self.device)
@@ -393,6 +397,7 @@ if __name__=="__main__":
     parser.add_argument('--use_meta', type=str, default="True", choices=["True","False"])    
     parser.add_argument('--output_normalization', type=str, default="True", choices=["True","False"])
     parser.add_argument('--fn', type=str, default="v0", choices=["v0","v1", "v0-rank", "v1-rank"])
+    parser.add_argument('--config_path',type=str, help='Path to config stored in yaml file. No value implies the CS will be sampled')
     args = parser.parse_args()
     args.weighted = eval(args.weighted)
     args.use_meta = eval(args.use_meta)
