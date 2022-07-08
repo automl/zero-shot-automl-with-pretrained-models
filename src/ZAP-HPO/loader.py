@@ -42,6 +42,7 @@ class TestDatabase(Dataset):
     else:
         cv_folds = pd.read_csv(os.path.join(data_path,"cv_folds.csv"),header=0, index_col = 0)
         testing_cls = list((cv_folds[cv_folds["fold"].isin([loo])]).index)
+    
     # process input
     predictors  = _list_of_metafeatures+_numerical_hps+_bool_hps+_categorical_hps if use_meta else _numerical_hps+_bool_hps+_categorical_hps
     attributes = data[predictors].copy()
@@ -53,7 +54,7 @@ class TestDatabase(Dataset):
 
     self.mean_output = mean_output
     self.std_output = std_output
-    self.xtest = attributes[data.dataset.isin(testing_cls)] # this is never used
+
     X_test = np.array(attributes[data.dataset.isin(testing_cls)])
     y_test = data[data.dataset.isin(testing_cls)]["accuracy"].ravel()
     
@@ -151,7 +152,6 @@ class TrainDatabaseCV(TrainDatabase):
         self.dense_idx = dense_idx
         X_train = X_train[dense_idx]
     
-
     X_valid = np.array(attributes[data.dataset.isin(valid_cls)])
 
     if input_normalization: # use sklearn or smth
@@ -225,21 +225,23 @@ class TrainDatabaseCV(TrainDatabase):
         self.y_star.update({"valid":torch.cat(y_star)})        
 
     else:
-
         for _set in ["train","valid"]:
             ndatasets = len(self.y[_set])//525
             y_star = []
             for i in range(ndatasets):
                 y_star += [max(self.values[_set][i])*torch.ones(525)]
             self.y_star.update({_set:torch.cat(y_star)})
-        if mode=="bpr" or mode=="tml":
-            self.larger_set = []
-            self.smaller_set = []
-            for d,k in enumerate(y_train):
-                ll = np.where(np.logical_and(y_train>k,self.ds_ref==self.ds_ref[d]))[0]
-                ss = np.where(np.logical_and(y_train<k,self.ds_ref==self.ds_ref[d]))[0]
-                self.larger_set.append(ll)
-                self.smaller_set.append(ss)
+
+    y_train = y_train if self.sparsity == 0 else y_train[dense_idx]
+    
+    if mode=="bpr" or mode=="tml":
+        self.larger_set = []
+        self.smaller_set = []
+        for d,k in enumerate(y_train):
+            ll = np.where(np.logical_and(y_train>k,self.ds_ref==self.ds_ref[d]))[0]
+            ss = np.where(np.logical_and(y_train<k,self.ds_ref==self.ds_ref[d]))[0]
+            self.larger_set.append(ll)
+            self.smaller_set.append(ss)
     
 class TrainDatabaseCVPlusLoo(TrainDatabase):
   def __init__(self, data_path, loo, cv, output_normalization=False, input_normalization=True, mode="regression", sparsity = 0., use_meta=True):
@@ -429,7 +431,7 @@ class TrainDatabaseLoo(TrainDatabase):
 def get_tr_loader(batch_size, data_path, loo, mode, use_meta=True, cv=None, split_type="cv", sparsity = 0, output_normalization = True):
     
   if split_type=="cv":
-      dataset = TrainDatabaseCV(data_path, cv, mode=mode, use_meta=use_meta, output_normalization = output_normalization)
+      dataset = TrainDatabaseCV(data_path, cv, mode=mode, sparsity = sparsity, use_meta=use_meta, output_normalization = output_normalization)
   else:
       dataset = TrainDatabaseCVPlusLoo(data_path, cv=cv, loo=loo, mode=mode, sparsity=sparsity, use_meta=use_meta)
   loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
