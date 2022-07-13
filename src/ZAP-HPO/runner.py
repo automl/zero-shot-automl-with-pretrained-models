@@ -98,22 +98,19 @@ class ModelRunner:
 
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.max_epoch, eta_min= config["min_lr"])
 
-        self.mtrloader,self.mtrloader_unshuffled =  get_tr_loader(config['batch_size'], self.data_path, loo=self.loo, cv=self.cv,
+        self.mtrloader, self.mtrloader_unshuffled =  get_tr_loader(config['batch_size'], self.data_path, loo=self.loo, cv=self.cv,
                                         mode=self.mode,split_type=self.split_type,sparsity =self.sparsity,
                                         use_meta=self.use_meta, output_normalization=self.output_normalization,
                                         num_aug = self.num_aug, num_pipelines = self.num_pipelines)
         
         if self.split_type == "loo":
             self.mtrloader_test =  get_ts_loader(self.data_path, self.loo,
-                                                 mu_in=self.mtrloader.dataset.mean_input,
-                                                 std_in=self.mtrloader.dataset.std_input,
-                                                 mu_out=self.mtrloader.dataset.mean_output,
-                                                 std_out=self.mtrloader.dataset.std_output,
+                                                 input_scaler = self.mtrloader.dataset.input_scaler,
+                                                 output_scaler = self.mtrloader.dataset.output_scaler,
                                                  use_meta=self.use_meta,
                                                  num_aug = self.num_aug, num_pipelines = self.num_pipelines)
         
-        self.acc_mean = self.mtrloader.dataset.mean_output
-        self.acc_std = self.mtrloader.dataset.std_output
+
         extra = f"-{self.sparsity}" if self.sparsity > 0 else ""
         extra += "-no-meta" if not self.use_meta else ""
         extra += "-normalized" if not self.output_normalization else ""
@@ -127,13 +124,14 @@ class ModelRunner:
         
         os.makedirs(self.model_path,exist_ok=True)
         self.mtrlog = Log(self.args, open(os.path.join(self.model_path, 'meta_train_predictor.log'), 'w'))
-        self.mtrlog.print_args(config)    
+        self.mtrlog.print_args(config)  
 
-        norm_dict = {'mean_input': self.mtrloader.dataset.mean_input, 'std_input': self.mtrloader.dataset.std_input}
+        with open(os.path.join(self.model_path, "input_scaler.pt"), 'wb') as f:
+            pickle.dump(self.mtrloader.dataset.input_scaler, f) 
 
-        norm_path = os.path.join(self.model_path, "norm.pt")      
-        with open(norm_path, 'wb') as f:
-            pickle.dump(norm_dict, f) 
+        with open(os.path.join(self.model_path, "output_scaler.pt"), 'wb') as f:
+            pickle.dump(self.mtrloader.dataset.output_scaler, f) 
+
     
     def train(self):
         history = {"trndcg": [], "vandcg": []}

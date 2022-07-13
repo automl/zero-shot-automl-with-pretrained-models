@@ -12,6 +12,8 @@ import os
 import pickle
 import numpy as np
 import copy
+from sklearn.preprocessing import StandardScaler
+
 _list_of_metafeatures = ['num_channels', 'num_classes', 'num_train', 'resolution_0']
 _bool_hps = ["first_simple_model", "amsgrad", "nesterov"]
 _categorical_hps = ['simple_model_LR', 'simple_model_NuSVC', 'simple_model_RF',
@@ -30,7 +32,7 @@ _apply_log = ["lr","wd","min_lr"]
 
 
 class TestDatabase(Dataset):
-  def __init__(self, data_path, loo, mean_input, std_input, mean_output, std_output, use_meta=True, num_aug = 15, num_pipelines = 525):
+  def __init__(self, data_path, loo, input_scaler = None, output_scaler = None, use_meta=True, num_aug = 15, num_pipelines = 525):
     
     # read data
     data =pd.read_csv(os.path.join(data_path, "data_m.csv"), header=0)
@@ -46,15 +48,17 @@ class TestDatabase(Dataset):
     for alog in _apply_log:
         attributes[alog] = attributes[alog].apply(lambda x: np.log(x))
     self.testing_cls = testing_cls
-    self.mean_input = mean_input
-    self.std_input = std_input
-
-    self.mean_output = mean_output
-    self.std_output = std_output
 
     X_test = np.array(attributes[data.dataset.isin(testing_cls)])
     y_test = data[data.dataset.isin(testing_cls)]["accuracy"].ravel()
     
+    if input_scaler:
+        len_bool_cat = len(_bool_hps+_categorical_hps)
+        # Scaling is done only for numerical HPs 
+        X_test = np.concatenate([input_scaler.transform(X_test[:,:-len_bool_cat]), X_test[:, X_test.shape[1]-len_bool_cat:]], axis = 1)
+    if output_scaler:
+        y_test = output_scaler.transform(y_test.reshape(-1,1)).reshape(-1)
+
     self.x = torch.tensor(X_test.astype(np.float32)) # this could be torch.from_numpy -> maybe faster
     self.y = torch.tensor(y_test.astype(np.float32))
     self.ranks = data[data.dataset.isin(testing_cls)]["ranks"].ravel().reshape(-1, num_pipelines)
@@ -66,8 +70,6 @@ class TestDatabase(Dataset):
   def __getitem__(self, index):
     x = self.x[index]
     y = self.y[index]
-    y = ((y - self.mean_output) / self.std_output)
-    x = ((x - self.mean_input) / self.std_input)
     return x, y
 
 class TrainDatabase(Dataset):
@@ -85,13 +87,10 @@ class TrainDatabase(Dataset):
     x = self.x[self.training][index]
     y = self.y[self.training][index] 
     ystar  = self.y_star[self.training][index]
-    y = ((y- self.mean_output) / self.std_output) # if possible, normalize samples beforehand
-    ys = ((ystar- self.mean_output) / self.std_output)
-    x = ((x- self.mean_input) / self.std_input)
-    return x, y, ys
+
+    return x, y, ystar
 
   def __get_bpr_item__(self, index):
-    # Let's clean this up
     x = self.x[self.training][index]
     y = self.y[self.training][index]
     r = self.ranks_flat[self.training][index]
@@ -106,10 +105,9 @@ class TrainDatabase(Dataset):
     except ValueError:
         smaller_idx = index
 
-    x = ((x - self.mean_input) / self.std_input)
-    s = ((self.x[self.training][smaller_idx] - self.mean_input) / self.std_input)
+    s = self.x[self.training][smaller_idx]
     r_s = self.ranks_flat[self.training][smaller_idx]
-    l = ((self.x[self.training][larger_idx]- self.mean_input) / self.std_input)
+    l = self.x[self.training][larger_idx]
     r_l = self.ranks_flat[self.training][larger_idx]
     
     return (x,s,l), (y, self.y[self.training][smaller_idx], self.y[self.training][larger_idx]), (r,r_s,r_l)
@@ -152,32 +150,28 @@ class TrainDatabaseCV(TrainDatabase):
     
     self.ndatasets = {"train": X_train.shape[0]//num_pipelines, "valid": X_valid.shape[0]//num_pipelines}
 
-    if input_normalization: # use sklearn or smth
-        self.std_input = np.concatenate([np.std(X_train[:,:-len(_bool_hps+_categorical_hps)], 0), np.ones(len(_bool_hps+_categorical_hps))]).astype(np.float32)
-        self.std_input[self.std_input == 0 ] = 1 # Why correct division by zero errors like this
-        self.mean_input = np.concatenate([np.mean(X_train[:,:-len(_bool_hps+_categorical_hps)], 0), np.zeros(len(_bool_hps+_categorical_hps))]).astype(np.float32)
-    else:
-        self.std_input = np.ones(X_train.shape[1]).astype(np.float32)
-        self.mean_input = np.zeros(X_train.shape[1]).astype(np.float32)
+    if input_normalization:
+        len_bool_cat = len(_bool_hps+_categorical_hps)
+        
+        self.input_scaler = StandardScaler()
+        self.input_scaler.fit(X_train[:,:-len_bool_cat])
 
-    self.mean_input = torch.from_numpy(self.mean_input)
-    self.std_input = torch.from_numpy(self.std_input)
+        # Scaling is done only for numerical HPs 
+        X_train = np.concatenate([self.input_scaler.transform(X_train[:,:-len_bool_cat]), X_train[:, X_train.shape[1]-len_bool_cat:]], axis = 1)
+        X_valid = np.concatenate([self.input_scaler.transform(X_valid[:,:-len_bool_cat]), X_valid[:, X_train.shape[1]-len_bool_cat:]], axis = 1)
     
     # process output
     y_train = data[data.dataset.isin(training_cls)]["accuracy"].ravel()
     y_valid= data[data.dataset.isin(valid_cls)]["accuracy"].ravel()
     rank_train = data[data.dataset.isin(training_cls)]["ranks"].ravel()
     rank_valid = data[data.dataset.isin(valid_cls)]["ranks"].ravel()
+
     if output_normalization:
-        self.mean_output = np.mean(y_train).astype(np.float32)
-        self.std_output = np.std(y_train).astype(np.float32)
-        try:
-            assert self.std_output !=0.
-        except Exception:
-            self.std_output = 1.
-    else:
-        self.mean_output = 0.
-        self.std_output = 1.
+        self.output_scaler = StandardScaler()
+        self.output_scaler.fit(y_train.reshape(-1,1))
+
+        y_train = self.output_scaler.transform(y_train.reshape(-1,1)).reshape(-1)
+        y_valid = self.output_scaler.transform(y_valid.reshape(-1,1)).reshape(-1)
 
     self.x = {"train":torch.tensor(X_train.astype(np.float32)),
               "valid":torch.tensor(X_valid.astype(np.float32))}
@@ -283,27 +277,31 @@ class TrainDatabaseCVPlusLoo(TrainDatabase):
         X_train = X_train[dense_idx]
 
     if input_normalization:
-        self.std_input = np.concatenate([np.std(X_train[:,:-len(_bool_hps+_categorical_hps)], 0),
-                                         np.ones(len(_bool_hps+_categorical_hps))]).astype(np.float32)
-        self.std_input[self.std_input == 0 ] = 1
-        self.mean_input = np.concatenate([np.mean(X_train[:,:-len(_bool_hps+_categorical_hps)], 0),
-                                          np.zeros(len(_bool_hps+_categorical_hps))]).astype(np.float32)
-    else:
-        self.std_input = np.ones(X_train.shape[1]).astype(np.float32)
-        self.mean_input = np.zeros(X_train.shape[1]).astype(np.float32)
+        len_bool_cat = len(_bool_hps+_categorical_hps)
+        
+        self.input_scaler = StandardScaler()
+        self.input_scaler.fit(X_train[:,:-len_bool_cat])
 
-    self.mean_input = torch.from_numpy(self.mean_input) #added
-    self.std_input = torch.from_numpy(self.std_input) #added
+        # Scaling is done only for numerical HPs 
+        X_train = np.concatenate([self.input_scaler.transform(X_train[:,:-len_bool_cat]), X_train[:, X_train.shape[1]-len_bool_cat:]], axis = 1)
+        X_valid = np.concatenate([self.input_scaler.transform(X_valid[:,:-len_bool_cat]), X_valid[:, X_train.shape[1]-len_bool_cat:]], axis = 1)
 
-    self.x = {"train":torch.tensor(X_train.astype(np.float32)),
-              "valid":torch.tensor(X_valid.astype(np.float32))}
     
     # process output
     y_train = data[data.dataset.isin(training_cls)]["accuracy"].ravel()
     y_valid= data[data.dataset.isin(valid_cls)]["accuracy"].ravel()
     rank_train = data[data.dataset.isin(training_cls)]["ranks"].ravel()
     rank_valid = data[data.dataset.isin(valid_cls)]["ranks"].ravel()
-    # train will be changed in case of missing values
+
+    if output_normalization:
+        self.output_scaler = StandardScaler()
+        self.output_scaler.fit(y_train.reshape(-1,1))
+
+        y_train = self.output_scaler.transform(y_train.reshape(-1,1)).reshape(-1)
+        y_valid = self.output_scaler.transform(y_valid.reshape(-1,1)).reshape(-1)
+
+    self.x = {"train":torch.tensor(X_train.astype(np.float32)),
+              "valid":torch.tensor(X_valid.astype(np.float32))}
     self.y = {"train":torch.tensor(y_train.astype(np.float32)),
               "valid":torch.tensor(y_valid.astype(np.float32))}
     
@@ -362,24 +360,13 @@ class TrainDatabaseCVPlusLoo(TrainDatabase):
             self.larger_set.append(ll)
             self.smaller_set.append(ss)
 
-    if output_normalization:
-        self.mean_output = np.mean(y_train).astype(np.float32)
-        self.std_output = np.std(y_train).astype(np.float32)
-        try:
-            assert self.std_output !=0.
-        except Exception:
-            self.std_output = 1.
-    else:
-        self.mean_output = 0.
-        self.std_output = 1.            
-
 
 def get_tr_loader(batch_size, data_path, loo, mode, use_meta=True, cv=None, split_type="cv", sparsity = 0, output_normalization = True, num_aug = 15, num_pipelines = 525):
     
     if split_type=="cv":
         dataset = TrainDatabaseCV(data_path, cv=cv, mode=mode, sparsity = sparsity, use_meta=use_meta, output_normalization = output_normalization, num_pipelines = num_pipelines)
     elif split_type=="loo":
-        dataset = TrainDatabaseCVPlusLoo(data_path, cv=cv, loo=loo, mode=mode, sparsity=sparsity, use_meta=use_meta, num_aug = num_aug, num_pipelines = num_pipelines)
+        dataset = TrainDatabaseCVPlusLoo(data_path, cv=cv, loo=loo, mode=mode, sparsity=sparsity, output_normalization = output_normalization, use_meta=use_meta, num_aug = num_aug, num_pipelines = num_pipelines)
     else:
         print("Please provide a valid split type {cv|loo}")
 
@@ -387,10 +374,11 @@ def get_tr_loader(batch_size, data_path, loo, mode, use_meta=True, cv=None, spli
 
     unshuffled_loader = DataLoader(dataset=copy.deepcopy(dataset), batch_size=num_pipelines, shuffle=False)
     unshuffled_loader.dataset.mode="regression"
+
     return loader, unshuffled_loader
 
-def get_ts_loader(data_path, loo, mu_in, std_in, mu_out, std_out, use_meta=True, num_aug = 15, num_pipelines = 525):
-    dataset = TestDatabase(data_path, loo, mu_in, std_in, mu_out, std_out, use_meta=use_meta, num_aug = num_aug, num_pipelines = num_pipelines)
+def get_ts_loader(data_path, loo, input_scaler = None, output_scaler = None, use_meta=True, num_aug = 15, num_pipelines = 525):
+    dataset = TestDatabase(data_path, loo, input_scaler = input_scaler, output_scaler = output_scaler, use_meta=use_meta, num_aug = num_aug, num_pipelines = num_pipelines)
     loader = DataLoader(dataset=dataset, batch_size=num_pipelines, shuffle=False)
     return loader    
 
