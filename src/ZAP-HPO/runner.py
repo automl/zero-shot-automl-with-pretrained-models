@@ -65,8 +65,11 @@ class ModelRunner:
         self.max_epoch = args.max_epoch
         self.save_epoch = args.save_epoch
         self.save_path = args.save_path
+        self.split_type = args.split_type
         self.loo =  args.loo
         self.cv = args.cv
+        self.num_aug = args.num_aug
+        self.num_pipelines = args.num_pipelines
         self.mode = args.mode
         self.seed = args.seed
         self.weighted = args.weighted
@@ -96,15 +99,18 @@ class ModelRunner:
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.max_epoch, eta_min= config["min_lr"])
 
         self.mtrloader,self.mtrloader_unshuffled =  get_tr_loader(config['batch_size'], self.data_path, loo=self.loo, cv=self.cv,
-                                        mode=self.mode,split_type=args.split_type,sparsity =self.sparsity,
-                                        use_meta=self.use_meta, output_normalization=self.output_normalization)
+                                        mode=self.mode,split_type=self.split_type,sparsity =self.sparsity,
+                                        use_meta=self.use_meta, output_normalization=self.output_normalization,
+                                        num_aug = self.num_aug, num_pipelines = self.num_pipelines)
         
-        self.mtrloader_test =  get_ts_loader(525, self.data_path, self.loo,
-                                              mu_in=self.mtrloader.dataset.mean_input,
-                                              std_in=self.mtrloader.dataset.std_input,
-                                              mu_out=self.mtrloader.dataset.mean_output,
-                                              std_out=self.mtrloader.dataset.std_output,split_type=args.split_type,
-                                              use_meta=self.use_meta)
+        if self.split_type == "loo":
+            self.mtrloader_test =  get_ts_loader(self.data_path, self.loo,
+                                                 mu_in=self.mtrloader.dataset.mean_input,
+                                                 std_in=self.mtrloader.dataset.std_input,
+                                                 mu_out=self.mtrloader.dataset.mean_output,
+                                                 std_out=self.mtrloader.dataset.std_output,
+                                                 use_meta=self.use_meta,
+                                                 num_aug = self.num_aug, num_pipelines = self.num_pipelines)
         
         self.acc_mean = self.mtrloader.dataset.mean_output
         self.acc_std = self.mtrloader.dataset.std_output
@@ -114,7 +120,7 @@ class ModelRunner:
         if self.mode == "bpr":
             extra += f"-function-{self.fn}" if self.weighted else ""
 
-        if args.split_type!="loo":
+        if self.split_type!="loo":
             self.model_path = os.path.join(self.save_path, f"{'weighted-' if self.weighted else ''}{self.mode}{extra}", str(self.seed), str(self.cv))
         else:
             self.model_path = os.path.join(self.save_path+"-cvplusloo", f"{'weighted-' if self.weighted else ''}{self.mode}{extra}", str(self.seed), str(self.loo),str(self.cv))
@@ -123,7 +129,7 @@ class ModelRunner:
         self.mtrlog = Log(self.args, open(os.path.join(self.model_path, 'meta_train_predictor.log'), 'w'))
         self.mtrlog.print_args(config)    
 
-        norm_dict = {'mean': self.mtrloader.dataset.mean_input, 'std': self.mtrloader.dataset.std_input}
+        norm_dict = {'mean_input': self.mtrloader.dataset.mean_input, 'std_input': self.mtrloader.dataset.std_input}
 
         norm_path = os.path.join(self.model_path, "norm.pt")      
         with open(norm_path, 'wb') as f:
@@ -131,7 +137,6 @@ class ModelRunner:
     
     def train(self):
         history = {"trndcg": [], "vandcg": []}
-        patience = 0
         for epoch in range(1, self.max_epoch + 1):
             self.mtrlog.ep_sttime = time.time()
             if self.mode=="regression":
@@ -141,14 +146,16 @@ class ModelRunner:
             elif self.mode=="tml":
                 loss = self.train_tml_epoch(epoch)
 
-            patience += 1
-
             self.scheduler.step()
 
             self.mtrlog.print_pred_log(loss, 0, 'train', epoch=epoch)
             vacorr, vaccc, vandcg = self.validation(epoch, "valid")
             trcorr, tracc, trndcg = self.validation(epoch, "train")
-            tecorr, teacc, tendcg = self.test(epoch)
+
+            if self.split_type == "loo":
+                tecorr, teacc, tendcg = self.test(epoch)
+            else:
+                tecorr, teacc, tendcg = 0, 0, {"NDCG@5":0,"NDCG@10":0,"NDCG@20":0}
 
             if self.max_corr_dict['rank@1'] >= vacorr:
                 patience = 0
@@ -158,9 +165,7 @@ class ModelRunner:
                 self.max_corr_dict['epoch'] = epoch
                 self.max_corr_dict.update(vandcg)
                 save_model(epoch, self.model, self.model_path, max_corr=True)
-                
-            #if patience >= 25:
-             #   break
+
 
             self.mtrlog.print_pred_log(0, vacorr, 'valid', ndcg=vandcg, max_corr_dict=self.max_corr_dict)
             
@@ -359,20 +364,20 @@ class ModelRunner:
         cs = CS.ConfigurationSpace(seed=seed)
         
         lr = CSH.UniformFloatHyperparameter('lr', lower=1e-6, upper=1e-2, log=True)
-        min_lr = CSH.UniformFloatHyperparameter('min_lr', lower=1e-10, upper=1e-6, log=True)
-        optimizer = CSH.CategoricalHyperparameter('optimizer', ['Adam', 'SGD', 'AdamW']) # added SGD AdamW
-        weight_decay = CSH.UniformFloatHyperparameter('weight_decay', lower=1e-6, upper=1e-2, log=True) # added
-        batch_size = CSH.UniformIntegerHyperparameter('batch_size', lower=8, upper=128, default_value=64) # added
+        min_lr = CSH.UniformFloatHyperparameter('min_lr', lower=1e-8, upper=1e-6, log=True)
+        optimizer = CSH.CategoricalHyperparameter('optimizer', ['Adam', 'SGD', 'AdamW'])
+        weight_decay = CSH.UniformFloatHyperparameter('weight_decay', lower=1e-6, upper=1e-2, log=True)
+        batch_size = CSH.UniformIntegerHyperparameter('batch_size', lower=8, upper=128, default_value=64)
         cs.add_hyperparameters([lr, min_lr, optimizer, weight_decay, batch_size])
         
         num_hidden_layers =  CSH.UniformIntegerHyperparameter('num_hidden_layers', lower=2, upper=10)
-        num_hidden_units = CSH.UniformIntegerHyperparameter('num_hidden_units', lower=32, upper=512) # same
+        num_hidden_units = CSH.UniformIntegerHyperparameter('num_hidden_units', lower=32, upper=512)
         cs.add_hyperparameters([num_hidden_layers, num_hidden_units])
         
         dropout_rate = CSH.UniformFloatHyperparameter('dropout_rate', lower=0.0, upper=0.9, log=False)
         cs.add_hyperparameters([dropout_rate])
         
-        sgd_momentum = CSH.UniformFloatHyperparameter('sgd_momentum', lower=0.0, upper=0.99, log=False) # added for SGD
+        sgd_momentum = CSH.UniformFloatHyperparameter('sgd_momentum', lower=0.0, upper=0.99, log=False)
         cs.add_hyperparameters([sgd_momentum])
         momentum_cond = CS.EqualsCondition(sgd_momentum, optimizer, 'SGD')
         cs.add_conditions([momentum_cond])
@@ -398,6 +403,9 @@ if __name__=="__main__":
     parser.add_argument('--output_normalization', type=str, default="True", choices=["True","False"])
     parser.add_argument('--fn', type=str, default="v0", choices=["v0","v1", "v0-rank", "v1-rank"])
     parser.add_argument('--config_path',type=str, help='Path to config stored in yaml file. No value implies the CS will be sampled')
+    parser.add_argument('--num_aug', type=int, default=15, help='The number of ICGen augmentations per dataset')
+    parser.add_argument('--num_pipelines', type=int, default=525, help='The number of deep learning pipelines')
+
     args = parser.parse_args()
     args.weighted = eval(args.weighted)
     args.use_meta = eval(args.use_meta)

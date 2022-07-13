@@ -30,19 +30,16 @@ _apply_log = ["lr","wd","min_lr"]
 
 
 class TestDatabase(Dataset):
-  def __init__(self, data_path, loo, mean_input, std_input, mean_output, std_output, split_type="cv", use_meta=True):
+  def __init__(self, data_path, loo, mean_input, std_input, mean_output, std_output, use_meta=True, num_aug = 15, num_pipelines = 525):
     
     # read data
     data =pd.read_csv(os.path.join(data_path, "data_m.csv"), header=0)
-    if split_type=="loo":
-        with open(os.path.join(data_path,"cls_names.pkl"),"rb") as f:
-            self.cls = pickle.load(f)
-        
-        testing_cls = [f"{i}-{self.cls[loo]}" for i in range(15)]
-    else:
-        cv_folds = pd.read_csv(os.path.join(data_path,"cv_folds.csv"),header=0, index_col = 0)
-        testing_cls = list((cv_folds[cv_folds["fold"].isin([loo])]).index)
+
+    with open(os.path.join(data_path,"cls_names.pkl"),"rb") as f:
+        self.cls = pickle.load(f)
     
+    testing_cls = [f"{i}-{self.cls[loo]}" for i in range(num_aug)]
+
     # process input
     predictors  = _list_of_metafeatures+_numerical_hps+_bool_hps+_categorical_hps if use_meta else _numerical_hps+_bool_hps+_categorical_hps
     attributes = data[predictors].copy()
@@ -60,8 +57,8 @@ class TestDatabase(Dataset):
     
     self.x = torch.tensor(X_test.astype(np.float32)) # this could be torch.from_numpy -> maybe faster
     self.y = torch.tensor(y_test.astype(np.float32))
-    self.ranks = data[data.dataset.isin(testing_cls)]["ranks"].ravel().reshape(-1,525)
-    self.values = y_test.reshape(-1,525)
+    self.ranks = data[data.dataset.isin(testing_cls)]["ranks"].ravel().reshape(-1, num_pipelines)
+    self.values = y_test.reshape(-1, num_pipelines)
     
   def __len__(self):
     return len(self.y)
@@ -69,8 +66,8 @@ class TestDatabase(Dataset):
   def __getitem__(self, index):
     x = self.x[index]
     y = self.y[index]
-    y = ((y- self.mean_output) / self.std_output)
-    x = ((x- self.mean_input) / self.std_input)
+    y = ((y - self.mean_output) / self.std_output)
+    x = ((x - self.mean_input) / self.std_input)
     return x, y
 
 class TrainDatabase(Dataset):
@@ -118,7 +115,7 @@ class TrainDatabase(Dataset):
     return (x,s,l), (y, self.y[self.training][smaller_idx], self.y[self.training][larger_idx]), (r,r_s,r_l)
     
 class TrainDatabaseCV(TrainDatabase):
-  def __init__(self, data_path, cv, output_normalization=False, input_normalization=True, mode="regression", sparsity = 0., use_meta=True):
+  def __init__(self, data_path, cv, output_normalization=False, input_normalization=True, mode="regression", sparsity = 0., use_meta=True, num_pipelines = 525):
     super(TrainDatabase, self).__init__()
     self.training = "train"
     self.output_normalization = output_normalization
@@ -143,8 +140,9 @@ class TrainDatabaseCV(TrainDatabase):
     for alog in _apply_log:
         attributes[alog] = attributes[alog].apply(lambda x: np.log(x))
     self.attributes = attributes
+    
     X_train = np.array(attributes[data.dataset.isin(training_cls)])
-
+    X_valid = np.array(attributes[data.dataset.isin(valid_cls)])
     
     if self.sparsity>0:
         dense_idx = self.rng2.choice(X_train.shape[0],int((1-self.sparsity)*X_train.shape[0]),replace=False)
@@ -152,15 +150,15 @@ class TrainDatabaseCV(TrainDatabase):
         self.dense_idx = dense_idx
         X_train = X_train[dense_idx]
     
-    X_valid = np.array(attributes[data.dataset.isin(valid_cls)])
+    self.ndatasets = {"train": X_train.shape[0]//num_pipelines, "valid": X_valid.shape[0]//num_pipelines}
 
     if input_normalization: # use sklearn or smth
         self.std_input = np.concatenate([np.std(X_train[:,:-len(_bool_hps+_categorical_hps)], 0), np.ones(len(_bool_hps+_categorical_hps))]).astype(np.float32)
         self.std_input[self.std_input == 0 ] = 1 # Why correct division by zero errors like this
         self.mean_input = np.concatenate([np.mean(X_train[:,:-len(_bool_hps+_categorical_hps)], 0), np.zeros(len(_bool_hps+_categorical_hps))]).astype(np.float32)
     else:
-        self.std_input = np.ones(X_train.shape[ 1 ]).astype(np.float32)
-        self.mean_input = np.zeros(X_train.shape[ 1 ]).astype(np.float32)
+        self.std_input = np.ones(X_train.shape[1]).astype(np.float32)
+        self.mean_input = np.zeros(X_train.shape[1]).astype(np.float32)
 
     self.mean_input = torch.from_numpy(self.mean_input)
     self.std_input = torch.from_numpy(self.std_input)
@@ -188,13 +186,13 @@ class TrainDatabaseCV(TrainDatabase):
 
     # meta-dataset size 525 is hard-coded and should be corrected
 
-    self.values = {"train":y_train.reshape(-1,525),"valid":y_valid.reshape(-1,525)}
-    self.ranks = {"train":rank_train.reshape(-1,525),"valid":rank_valid.reshape(-1,525)}
+    self.values = {"train":y_train.reshape(-1,num_pipelines),"valid":y_valid.reshape(-1,num_pipelines)}
+    self.ranks = {"train":rank_train.reshape(-1,num_pipelines),"valid":rank_valid.reshape(-1,num_pipelines)}
     self.ranks_flat = dict()
     self.ranks_flat["valid"] = rank_valid/max(rank_valid)
     self.ranks_flat["train"] = rank_train/max(rank_train) 
     self.y_star = {"train":[],"valid": []}
-    self.ds_ref = np.concatenate([525*[i] for i in range(len(self.y["train"])//525)])
+    self.ds_ref = np.concatenate([num_pipelines*[i] for i in range(self.ndatasets["train"])])
 
     if self.sparsity > 0:
         self.ds_ref = self.ds_ref[dense_idx]    
@@ -218,18 +216,16 @@ class TrainDatabaseCV(TrainDatabase):
         self.ranks_flat.update({"train":ranks_flat})
     
         # values, ranks and y stay the same
-        ndatasets = len(self.y["valid"])//525
         y_star = []
-        for i in range(ndatasets):
-            y_star += [max(self.values["valid"][i])*torch.ones(525)]
+        for i in range(self.ndatasets["valid"]):
+            y_star += [max(self.values["valid"][i])*torch.ones(num_pipelines)]
         self.y_star.update({"valid":torch.cat(y_star)})        
 
     else:
         for _set in ["train","valid"]:
-            ndatasets = len(self.y[_set])//525
             y_star = []
-            for i in range(ndatasets):
-                y_star += [max(self.values[_set][i])*torch.ones(525)]
+            for i in range(self.ndatasets[_set]):
+                y_star += [max(self.values[_set][i])*torch.ones(num_pipelines)]
             self.y_star.update({_set:torch.cat(y_star)})
 
     y_train = y_train if self.sparsity == 0 else y_train[dense_idx]
@@ -244,7 +240,7 @@ class TrainDatabaseCV(TrainDatabase):
             self.smaller_set.append(ss)
     
 class TrainDatabaseCVPlusLoo(TrainDatabase):
-  def __init__(self, data_path, loo, cv, output_normalization=False, input_normalization=True, mode="regression", sparsity = 0., use_meta=True):
+  def __init__(self, data_path, loo, cv, output_normalization=False, input_normalization=True, mode="regression", sparsity = 0., use_meta=True, num_aug = 15, num_pipelines = 525):
     super(TrainDatabase, self).__init__()
     self.training = "train"
     self.output_normalization = output_normalization
@@ -257,15 +253,17 @@ class TrainDatabaseCVPlusLoo(TrainDatabase):
     # read data
     data = pd.read_csv(os.path.join(data_path,"data_m.csv"),header=0)
     cv_folds = pd.read_csv(os.path.join(data_path,"cv_folds.csv"), header=0, index_col = 0)
+    
     with open(os.path.join(data_path,"cls_names.pkl"),"rb") as f:
         self.cls = pickle.load(f)
+    
     # get training/test split 
     exclude_cls_original = self.cls[loo]
     exclude_cls = []
-    for aug in range(15):
+    for aug in range(num_aug):
         exclude_cls.append(f"{aug}-{exclude_cls_original}")
-    valid_cls = np.setdiff1d(list(cv_folds[cv_folds["fold"].isin([cv])].index),exclude_cls).tolist()
-    training_cls = np.setdiff1d(list(cv_folds[~cv_folds["fold"].isin([cv])].index),exclude_cls).tolist()
+    valid_cls = np.setdiff1d(list(cv_folds[cv_folds["fold"].isin([cv])].index), exclude_cls).tolist()
+    training_cls = np.setdiff1d(list(cv_folds[~cv_folds["fold"].isin([cv])].index), exclude_cls).tolist()
     # process input
     predictors  = _list_of_metafeatures+_numerical_hps+_bool_hps+_categorical_hps if use_meta else _numerical_hps+_bool_hps+_categorical_hps
     attributes = data[predictors].copy()
@@ -273,7 +271,10 @@ class TrainDatabaseCVPlusLoo(TrainDatabase):
     for alog in _apply_log:
         attributes[alog] = attributes[alog].apply(lambda x: np.log(x))
     self.attributes = attributes
+
     X_train = np.array(attributes[data.dataset.isin(training_cls)])
+    X_valid = np.array(attributes[data.dataset.isin(valid_cls)])
+    self.ndatasets = {"train": X_train.shape[0]//num_pipelines, "valid": X_valid.shape[0]//num_pipelines}
     
     if self.sparsity>0:
         dense_idx = self.rng2.choice(X_train.shape[0],int((1-self.sparsity)*X_train.shape[0]),replace=False)
@@ -281,8 +282,6 @@ class TrainDatabaseCVPlusLoo(TrainDatabase):
         self.dense_idx = dense_idx
         X_train = X_train[dense_idx]
 
-    X_valid = np.array(attributes[data.dataset.isin(valid_cls)])
-    
     if input_normalization:
         self.std_input = np.concatenate([np.std(X_train[:,:-len(_bool_hps+_categorical_hps)], 0),
                                          np.ones(len(_bool_hps+_categorical_hps))]).astype(np.float32)
@@ -290,8 +289,8 @@ class TrainDatabaseCVPlusLoo(TrainDatabase):
         self.mean_input = np.concatenate([np.mean(X_train[:,:-len(_bool_hps+_categorical_hps)], 0),
                                           np.zeros(len(_bool_hps+_categorical_hps))]).astype(np.float32)
     else:
-        self.std_input = np.ones(X_train.shape[ 1 ]).astype(np.float32)
-        self.mean_input = np.zeros(X_train.shape[ 1 ]).astype(np.float32)
+        self.std_input = np.ones(X_train.shape[1]).astype(np.float32)
+        self.mean_input = np.zeros(X_train.shape[1]).astype(np.float32)
 
     self.mean_input = torch.from_numpy(self.mean_input) #added
     self.std_input = torch.from_numpy(self.std_input) #added
@@ -308,15 +307,15 @@ class TrainDatabaseCVPlusLoo(TrainDatabase):
     self.y = {"train":torch.tensor(y_train.astype(np.float32)),
               "valid":torch.tensor(y_valid.astype(np.float32))}
     
-    self.values = {"train":y_train.reshape(-1,525),"valid":y_valid.reshape(-1,525)}
+    self.values = {"train":y_train.reshape(-1,num_pipelines),"valid":y_valid.reshape(-1,num_pipelines)}
     
-    self.ranks = {"train":rank_train.reshape(-1,525),"valid":rank_valid.reshape(-1,525)}
+    self.ranks = {"train":rank_train.reshape(-1,num_pipelines),"valid":rank_valid.reshape(-1,num_pipelines)}
     self.ranks_flat = dict()
     self.ranks_flat["valid"] = rank_valid/max(rank_valid)
     self.ranks_flat["train"] = rank_train/max(rank_train)
     self.y_star = {"train":[],"valid": []}
     
-    self.ds_ref = np.concatenate([525*[i] for i in range(len(self.y["train"])//525)])
+    self.ds_ref = np.concatenate([num_pipelines*[i] for i in range(self.ndatasets["train"])])
     
     if self.sparsity > 0:
         self.ds_ref = self.ds_ref[dense_idx]    
@@ -340,17 +339,16 @@ class TrainDatabaseCVPlusLoo(TrainDatabase):
         self.ranks_flat.update({"train":ranks_flat})
 
         # values, ranks and y stay the same
-        ndatasets = len(self.y["valid"])//525
+        
         y_star = []
-        for i in range(ndatasets):
-            y_star += [max(self.values["valid"][i])*torch.ones(525)]
+        for i in range(self.ndatasets["valid"]):
+            y_star += [max(self.values["valid"][i])*torch.ones(num_pipelines)]
         self.y_star.update({"valid":torch.cat(y_star)})            
     else:
         for _set in ["train","valid"]:
-            ndatasets = len(self.y[_set])//525
             y_star = []
-            for i in range(ndatasets):
-                y_star += [max(self.values[_set][i])*torch.ones(525)]
+            for i in range(self.ndatasets[_set]):
+                y_star += [max(self.values[_set][i])*torch.ones(num_pipelines)]
             self.y_star.update({_set:torch.cat(y_star)})
 
     y_train = y_train if self.sparsity == 0 else y_train[dense_idx]
@@ -374,73 +372,25 @@ class TrainDatabaseCVPlusLoo(TrainDatabase):
     else:
         self.mean_output = 0.
         self.std_output = 1.            
-            
-class TrainDatabaseLoo(TrainDatabase):
-  def __init__(self, data_path, loo, output_normalization=False,
-               input_normalization=True, mode="regression"):
-    super(TrainDatabase, self).__init__()
-    self.training = "train"
-    self.output_normalization = output_normalization
-    self.input_normalization = input_normalization
-    self.mode = mode
-    self.rng = np.random.default_rng(0)
-    # read data
-    data =pd.read_csv(os.path.join(data_path,"data_m.csv"),header=0)
-    with open(os.path.join(data_path,"cls_names.pkl"),"rb") as f:
-        self.cls = pickle.load(f)
+
+
+def get_tr_loader(batch_size, data_path, loo, mode, use_meta=True, cv=None, split_type="cv", sparsity = 0, output_normalization = True, num_aug = 15, num_pipelines = 525):
     
-    # get training/test split 
-    training_cls_idx = np.setdiff1d(np.arange(len(self.cls)),loo).tolist()
-    training_cls = []
-    for cls_idx in training_cls_idx:
-        for aug in range(15):
-            training_cls.append(f"{aug}-{self.cls[cls_idx]}")
-    
-    # process input
-    attributes = data[_list_of_metafeatures+_numerical_hps+_bool_hps+_categorical_hps]
-    for alog in _apply_log:
-        attributes[alog] = attributes[alog].apply(lambda x: np.log(x))
-    
-    X_train = np.array(attributes[data.dataset.isin(training_cls)])
-    if input_normalization:
-        self.std_input = np.concatenate([np.std(X_train[:,:-len(_bool_hps+_categorical_hps)], 0),
-                                         np.ones(len(_bool_hps+_categorical_hps))]).astype(np.float32)
-        self.std_input[self.std_input == 0 ] = 1
-        self.mean_input = np.concatenate([np.mean(X_train[:,:-len(_bool_hps+_categorical_hps)], 0),
-                                          np.zeros(len(_bool_hps+_categorical_hps))]).astype(np.float32)
+    if split_type=="cv":
+        dataset = TrainDatabaseCV(data_path, cv=cv, mode=mode, sparsity = sparsity, use_meta=use_meta, output_normalization = output_normalization, num_pipelines = num_pipelines)
+    elif split_type=="loo":
+        dataset = TrainDatabaseCVPlusLoo(data_path, cv=cv, loo=loo, mode=mode, sparsity=sparsity, use_meta=use_meta, num_aug = num_aug, num_pipelines = num_pipelines)
     else:
-        self.std_input = np.ones(X_train.shape[ 1 ]).astype(np.float32)
-        self.mean_input = np.zeros(X_train.shape[ 1 ]).astype(np.float32)
+        print("Please provide a valid split type {cv|loo}")
 
-    # process output
-    y_train = data[data.dataset.isin(training_cls)]["accuracy"].ravel()
-    if output_normalization:
-        self.mean_output = np.mean(y_train).astype(np.float32)
-        self.std_output = np.std(y_train).astype(np.float32)
-        try:
-            assert self.std_output !=0.
-        except Exception:
-            self.std_output = 1.
-    else:
-        self.mean_output = 0.
-        self.std_output = 1.
+    loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
 
-    self.x = {"train":torch.tensor(X_train.astype(np.float32))}
-    self.y = {"train":torch.tensor(y_train.astype(np.float32))}
+    unshuffled_loader = DataLoader(dataset=copy.deepcopy(dataset), batch_size=num_pipelines, shuffle=False)
+    unshuffled_loader.dataset.mode="regression"
+    return loader, unshuffled_loader
 
-def get_tr_loader(batch_size, data_path, loo, mode, use_meta=True, cv=None, split_type="cv", sparsity = 0, output_normalization = True):
-    
-  if split_type=="cv":
-      dataset = TrainDatabaseCV(data_path, cv, mode=mode, sparsity = sparsity, use_meta=use_meta, output_normalization = output_normalization)
-  else:
-      dataset = TrainDatabaseCVPlusLoo(data_path, cv=cv, loo=loo, mode=mode, sparsity=sparsity, use_meta=use_meta)
-  loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
-  unshuffled_loader = DataLoader(dataset=copy.deepcopy(dataset), batch_size=525, shuffle=False)
-  unshuffled_loader.dataset.mode="regression"
-  return loader, unshuffled_loader
-
-def get_ts_loader(batch_size, data_path, loo, mu_in, std_in, mu_out, std_out, split_type="loo", use_meta=True):
-  dataset = TestDatabase(data_path, loo, mu_in, std_in, mu_out, std_out, split_type=split_type, use_meta=use_meta)
-  loader = DataLoader(dataset=dataset,batch_size=batch_size,shuffle=False)
-  return loader    
+def get_ts_loader(data_path, loo, mu_in, std_in, mu_out, std_out, use_meta=True, num_aug = 15, num_pipelines = 525):
+    dataset = TestDatabase(data_path, loo, mu_in, std_in, mu_out, std_out, use_meta=use_meta, num_aug = num_aug, num_pipelines = num_pipelines)
+    loader = DataLoader(dataset=dataset, batch_size=num_pipelines, shuffle=False)
+    return loader    
 

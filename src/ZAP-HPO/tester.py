@@ -27,6 +27,8 @@ class ModelTester:
         self.data_path = args.data_path
         self.loo =  args.loo
         self.cv = args.cv
+        self.num_aug = args.num_aug
+        self.num_pipelines = args.num_pipelines
         self.mode = args.mode
         self.seed = args.seed
         self.sparsity = args.sparsity
@@ -48,15 +50,18 @@ class ModelTester:
             
         if args.load_model:
             load_model(self.model,device=self.device, model_path = self.model_path)
+        
         self.mtrloader,self.mtrloader_unshuffled =  get_tr_loader(64, self.data_path, loo=self.loo, cv=self.cv,
                                         mode=self.mode,split_type=args.split_type,sparsity =self.sparsity,
                                         use_meta=self.use_meta)
-        self.mtrloader_test =  get_ts_loader(525, self.data_path, self.loo,
-                                              mu_in=self.mtrloader.dataset.mean_input,
-                                              std_in=self.mtrloader.dataset.std_input,
-                                              mu_out=self.mtrloader.dataset.mean_output,
-                                              std_out=self.mtrloader.dataset.std_output,split_type=args.split_type,
-                                              use_meta=self.use_meta)
+
+        self.mtrloader_test =  get_ts_loader(self.data_path, self.loo,
+                                             mu_in=self.mtrloader.dataset.mean_input,
+                                             std_in=self.mtrloader.dataset.std_input,
+                                             mu_out=self.mtrloader.dataset.mean_output,
+                                             std_out=self.mtrloader.dataset.std_output,
+                                             use_meta=self.use_meta,
+                                             num_aug = self.num_aug, num_pipelines = self.num_pipelines)
         
 
     def test(self):
@@ -103,6 +108,8 @@ if __name__=="__main__":
     parser.add_argument('--use-meta', type=str, default="True", choices=["True","False"])
     parser.add_argument('--config_path',type=str,
                         help= 'Path to config stored in yaml file. No value implies the CS will be sampled')
+    parser.add_argument('--num_aug', type=int, default=15, help='The number of ICGen augmentations per dataset')
+    parser.add_argument('--num_pipelines', type=int, default=525, help='The number of deep learning pipelines')
     args = parser.parse_args()
     args.use_meta = eval(args.use_meta)
     args.load_model = eval(args.load_model)
@@ -110,6 +117,6 @@ if __name__=="__main__":
     scores  = runner.test()
     names = []
     for i in runner.mtrloader_test.dataset.testing_cls:
-        names += [i]*525
+        names += [i]*args.num_pipelines
     data = pd.DataFrame(names,columns=["dataset"])
     data["scores"] = scores
