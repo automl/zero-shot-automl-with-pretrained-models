@@ -27,6 +27,7 @@ import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 
 
+
 class batch_mlp(nn.Module):
     def __init__(self, d_in, output_sizes, nonlinearity="relu", dropout=0.0):
         
@@ -60,7 +61,10 @@ def WMSE(input,target,weights):
 class ModelRunner:
     def __init__(self,args):
 
+        torch.manual_seed(args.seed)
+
         self.args = args
+        self.seed = args.seed
         self.data_path = args.data_path
         self.max_epoch = args.max_epoch
         self.save_epoch = args.save_epoch
@@ -71,7 +75,6 @@ class ModelRunner:
         self.num_aug = args.num_aug
         self.num_pipelines = args.num_pipelines
         self.mode = args.mode
-        self.seed = args.seed
         self.weighted = args.weighted
         self.sparsity = args.sparsity
         self.use_meta = args.use_meta
@@ -98,7 +101,7 @@ class ModelRunner:
 
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.max_epoch, eta_min= config["min_lr"])
 
-        self.mtrloader, self.mtrloader_unshuffled =  get_tr_loader(config['batch_size'], self.data_path, loo=self.loo, cv=self.cv,
+        self.mtrloader, self.mtrloader_unshuffled =  get_tr_loader(self.seed, config['batch_size'], self.data_path, loo=self.loo, cv=self.cv,
                                         mode=self.mode,split_type=self.split_type,sparsity =self.sparsity,
                                         use_meta=self.use_meta, output_normalization=self.output_normalization,
                                         num_aug = self.num_aug, num_pipelines = self.num_pipelines)
@@ -386,7 +389,7 @@ if __name__=="__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--seed', type=int, default=2)
+    parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--save_path', type=str, default='../ckpts_norm', help='the path of save directory')
     parser.add_argument('--data_path', type=str, default='../../data', help='the path of save directory')
     parser.add_argument('--mode', type=str, default='bpr', help='training objective',choices=["regression", "bpr", "tml"])

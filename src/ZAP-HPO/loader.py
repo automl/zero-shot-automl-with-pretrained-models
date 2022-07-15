@@ -113,16 +113,16 @@ class TrainDatabase(Dataset):
     return (x,s,l), (y, self.y[self.training][smaller_idx], self.y[self.training][larger_idx]), (r,r_s,r_l)
     
 class TrainDatabaseCV(TrainDatabase):
-  def __init__(self, data_path, cv, output_normalization=False, input_normalization=True, mode="regression", sparsity = 0., use_meta=True, num_pipelines = 525):
+  def __init__(self, seed, data_path, cv, output_normalization=False, input_normalization=True, mode="regression", sparsity = 0., use_meta=True, num_pipelines = 525):
     super(TrainDatabase, self).__init__()
     self.training = "train"
     self.output_normalization = output_normalization
     self.input_normalization = input_normalization
     self.mode = mode
     self.sparsity = sparsity
-    self.rng = np.random.default_rng(0)
-    self.rng2 = np.random.default_rng(0)
-    self.valid_rng = np.random.default_rng(0)
+    self.rng = np.random.default_rng(seed)
+    self.rng2 = np.random.default_rng(seed)
+    self.valid_rng = np.random.default_rng(seed)
 
     # read data
     data = pd.read_csv(os.path.join(data_path,"data_m.csv"),header=0)
@@ -234,16 +234,16 @@ class TrainDatabaseCV(TrainDatabase):
             self.smaller_set.append(ss)
     
 class TrainDatabaseCVPlusLoo(TrainDatabase):
-  def __init__(self, data_path, loo, cv, output_normalization=False, input_normalization=True, mode="regression", sparsity = 0., use_meta=True, num_aug = 15, num_pipelines = 525):
+  def __init__(self, seed, data_path, loo, cv, output_normalization=False, input_normalization=True, mode="regression", sparsity = 0., use_meta=True, num_aug = 15, num_pipelines = 525):
     super(TrainDatabase, self).__init__()
     self.training = "train"
     self.output_normalization = output_normalization
     self.input_normalization = input_normalization
     self.mode = mode
     self.sparsity = sparsity
-    self.rng = np.random.default_rng(0)
-    self.rng2 = np.random.default_rng(0)
-    self.valid_rng = np.random.default_rng(0)
+    self.rng = np.random.default_rng(seed)
+    self.rng2 = np.random.default_rng(seed)
+    self.valid_rng = np.random.default_rng(seed)
     # read data
     data = pd.read_csv(os.path.join(data_path,"data_m.csv"),header=0)
     cv_folds = pd.read_csv(os.path.join(data_path,"cv_folds.csv"), header=0, index_col = 0)
@@ -361,12 +361,12 @@ class TrainDatabaseCVPlusLoo(TrainDatabase):
             self.smaller_set.append(ss)
 
 
-def get_tr_loader(batch_size, data_path, loo, mode, use_meta=True, cv=None, split_type="cv", sparsity = 0, output_normalization = True, num_aug = 15, num_pipelines = 525):
+def get_tr_loader(seed, batch_size, data_path, loo, mode, use_meta=True, cv=None, split_type="cv", sparsity = 0, output_normalization = True, num_aug = 15, num_pipelines = 525):
     
     if split_type=="cv":
-        dataset = TrainDatabaseCV(data_path, cv=cv, mode=mode, sparsity = sparsity, use_meta=use_meta, output_normalization = output_normalization, num_pipelines = num_pipelines)
+        dataset = TrainDatabaseCV(seed, data_path, cv=cv, mode=mode, sparsity = sparsity, use_meta=use_meta, output_normalization = output_normalization, num_pipelines = num_pipelines)
     elif split_type=="loo":
-        dataset = TrainDatabaseCVPlusLoo(data_path, cv=cv, loo=loo, mode=mode, sparsity=sparsity, output_normalization = output_normalization, use_meta=use_meta, num_aug = num_aug, num_pipelines = num_pipelines)
+        dataset = TrainDatabaseCVPlusLoo(seed, data_path, cv=cv, loo=loo, mode=mode, sparsity=sparsity, output_normalization = output_normalization, use_meta=use_meta, num_aug = num_aug, num_pipelines = num_pipelines)
     else:
         print("Please provide a valid split type {cv|loo}")
 
