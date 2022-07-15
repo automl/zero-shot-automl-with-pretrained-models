@@ -59,7 +59,7 @@ class TestDatabase(Dataset):
     if output_scaler:
         y_test = output_scaler.transform(y_test.reshape(-1,1)).reshape(-1)
 
-    self.x = torch.tensor(X_test.astype(np.float32)) # this could be torch.from_numpy -> maybe faster
+    self.x = torch.tensor(X_test.astype(np.float32))
     self.y = torch.tensor(y_test.astype(np.float32))
     self.ranks = data[data.dataset.isin(testing_cls)]["ranks"].ravel().reshape(-1, num_pipelines)
     self.values = y_test.reshape(-1, num_pipelines)
@@ -177,8 +177,6 @@ class TrainDatabaseCV(TrainDatabase):
               "valid":torch.tensor(X_valid.astype(np.float32))}
     self.y = {"train":torch.tensor(y_train.astype(np.float32)),
               "valid":torch.tensor(y_valid.astype(np.float32))}
-
-    # meta-dataset size 525 is hard-coded and should be corrected
 
     self.values = {"train":y_train.reshape(-1,num_pipelines),"valid":y_valid.reshape(-1,num_pipelines)}
     self.ranks = {"train":rank_train.reshape(-1,num_pipelines),"valid":rank_valid.reshape(-1,num_pipelines)}

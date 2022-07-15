@@ -27,7 +27,6 @@ import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 
 
-
 class batch_mlp(nn.Module):
     def __init__(self, d_in, output_sizes, nonlinearity="relu", dropout=0.0):
         
@@ -150,6 +149,7 @@ class ModelRunner:
             self.scheduler.step()
 
             self.mtrlog.print_pred_log(loss, 0, 'train', epoch=epoch)
+
             vacorr, vaccc, vandcg = self.validation(epoch, "valid")
             trcorr, tracc, trndcg = self.validation(epoch, "train")
 
@@ -194,16 +194,19 @@ class ModelRunner:
         return history
         
     def train_epoch(self, epoch):
-        self.model.to(self.device)
         self.model.train()
+        self.model.to(self.device)
+
         self.mtrloader.dataset.training="train"
         dlen = 0
         trloss = 0
         pbar = self.mtrloader
         for x, acc, y_ in pbar:
+            x = x.to(self.device)
+            y = acc.to(self.device)
             self.optimizer.zero_grad()
             y_pred = self.model.forward(x)
-            y = acc.to(self.device)
+            
             if not self.weighted:
               loss = nn.MSELoss()(y_pred, y.unsqueeze(-1))
             else:
@@ -219,19 +222,25 @@ class ModelRunner:
     
         return trloss/dlen
 
-    def train_bpr_epoch(self, epoch, int_normalization = True):
-        self.model.to(self.device)
+    def train_bpr_epoch(self, epoch):
         self.model.train()
+        self.model.to(self.device)
+
         dlen = 0
         trloss = 0
         pbar = self.mtrloader
 
         for (x, s, l), (acc,acc_s,acc_l), (r,r_s,r_l) in pbar:
+            
+            x = x.to(self.device)
+            s = s.to(self.device)
+            l = l.to(self.device)
+
             self.optimizer.zero_grad()
+
             y_pred = self.model.forward(x)
             y_pred_s = self.model.forward(s)
             y_pred_l = self.model.forward(l) 
-
 
             output_gr_smaller = nn.Sigmoid()(y_pred - y_pred_s) # batch
             larger_gr_output  = nn.Sigmoid()(y_pred_l - y_pred)
@@ -259,7 +268,7 @@ class ModelRunner:
 
                 loss = nn.BCELoss(weight=weights.unsqueeze(-1))(logits, torch.ones_like(logits))    
             else:
-                loss = nn.BCELoss()(logits, torch.ones_like(logits))
+                loss = nn.BCELoss()(logits, torch.ones_like(logits).to(self.device))
 
             loss.backward()
             self.optimizer.step()
@@ -270,13 +279,19 @@ class ModelRunner:
         return trloss/dlen
 
     def train_tml_epoch(self, epoch, margin = 1.0):
-        self.model.to(self.device)
         self.model.train()
+        self.model.to(self.device)
+
         dlen = 0
         trloss = 0
         pbar = self.mtrloader
 
         for (x, s, l), (acc,acc_s,acc_l), (r,r_s,r_l) in pbar:
+
+            x = x.to(self.device)
+            s = s.to(self.device)
+            l = l.to(self.device)
+            
             self.optimizer.zero_grad()
 
             # perf predictions for target, inferior, superior configurations
@@ -296,8 +311,9 @@ class ModelRunner:
         return trloss/dlen    
 
     def validation(self, epoch, training):
-        self.model.to(self.device)
         self.model.eval()
+        self.model.to(self.device)
+
         self.mtrloader_unshuffled.dataset.training=training
         pbar = self.mtrloader_unshuffled
         scores_5 = []
@@ -309,8 +325,10 @@ class ModelRunner:
         actual_y = []
         with torch.no_grad():
           for i,(x,acc,y_) in enumerate(pbar):
-            y_pred = self.model.forward(x).squeeze().tolist()
+            x = x.to(self.device)
             y = acc.to(self.device).tolist()
+            y_pred = self.model.forward(x).squeeze().tolist()
+            
             actual_y += y
             predicted_y += y_pred
             if training!="train": # batch_isez is fixed
@@ -336,8 +354,9 @@ class ModelRunner:
         return np.mean(ranks),np.mean(values), {"NDCG@5":np.mean(scores_5),"NDCG@10":np.mean(scores_10),"NDCG@20":np.mean(scores_20)}
 
     def test(self, epoch):
-        self.model.to(self.device)
         self.model.eval()
+        self.model.to(self.device)
+
         pbar = self.mtrloader_test
         scores_5 = []
         scores_10 = []
@@ -346,9 +365,9 @@ class ModelRunner:
         values = []
         with torch.no_grad():
           for i,(x,acc) in enumerate(pbar):
+            x = x.to(self.device)
+            y = acc.to(self.device).tolist()
             y_pred = self.model.forward(x)
-            y = acc.to(self.device)
-            y = y.tolist()
             y_pred = y_pred.squeeze().tolist()
             scores_5.append(ndcg_score(y_true=np.array(y).reshape(1,-1),y_score=np.maximum(1e-7,np.array(y_pred)).reshape(1,-1),k=5))
             scores_10.append(ndcg_score(y_true=np.array(y).reshape(1,-1),y_score=np.maximum(1e-7,np.array(y_pred)).reshape(1,-1),k=10))
