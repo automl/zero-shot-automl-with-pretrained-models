@@ -1,0 +1,3 @@
+[submodule "src/autodl-contrib"]
+	path = src/autodl-contrib
+	url = https://github.com/ekremozturk/autodl-contrib.git
