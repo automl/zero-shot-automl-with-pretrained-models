@@ -222,6 +222,29 @@ class ModelRunner:
     
         return trloss/dlen
 
+    def calculate_bpr_loss(self,acc,acc_s,acc_l, r, r_s,r_l,logits):
+        if self.weighted:
+            if self.fn == "v0":
+                weights = torch.cat([torch.exp(-(acc - acc_s).pow(2)),
+                                     torch.exp(-(acc_s - acc).pow(2)),
+                                     torch.exp(-(acc_l - acc_s).pow(2))], 0)
+            elif self.fn == "v1":
+                weights = torch.cat([(acc - acc_s).pow(2),
+                                     (acc_l - acc).pow(2),
+                                     (acc_l - acc_s).pow(2)], 0)
+            elif self.fn == "v0-rank":
+                weights = torch.cat([torch.exp(-((r - r_s)).pow(2)),
+                                     torch.exp(-((r_l - r)).pow(2)),
+                                     torch.exp(-((r_l - r_s)).pow(2))], 0)
+            elif self.fn == "v1-rank":
+                weights = torch.cat([((r - r_s)).pow(2),
+                                     ((r_l - r)).pow(2),
+                                     ((r_l - r_s)).pow(2)], 0)
+
+            return nn.BCELoss(weight=weights.unsqueeze(-1))(logits, torch.ones_like(logits))
+        else:
+            return nn.BCELoss()(logits, torch.ones_like(logits).to(self.device))
+
     def train_bpr_epoch(self, epoch):
         self.model.train()
         self.model.to(self.device)
@@ -248,27 +271,7 @@ class ModelRunner:
 
             logits = torch.cat([output_gr_smaller,larger_gr_output,larger_gr_smaller], 0) # concatenates end to end
 
-            if self.weighted:
-                if self.fn=="v0":
-                    weights = torch.cat([torch.exp(-(acc-acc_s).pow(2)),
-                                        torch.exp(-(acc_l-acc).pow(2)),
-                                        torch.exp(-(acc_l-acc_s).pow(2))],0)
-                elif self.fn=="v1":
-                    weights = torch.cat([(acc-acc_s).pow(2),
-                                        (acc_l-acc).pow(2),
-                                        (acc_l-acc_s).pow(2)],0)
-                elif self.fn=="v0-rank":
-                    weights = torch.cat([torch.exp(-((r-r_s)).pow(2)),
-                                        torch.exp(-((r_l-r)).pow(2)),
-                                        torch.exp(-((r_l-r_s)).pow(2))],0)
-                elif self.fn=="v1-rank":
-                    weights = torch.cat([((r-r_s)).pow(2),
-                                        ((r_l-r)).pow(2),
-                                        ((r_l-r_s)).pow(2)],0)
-
-                loss = nn.BCELoss(weight=weights.unsqueeze(-1))(logits, torch.ones_like(logits))    
-            else:
-                loss = nn.BCELoss()(logits, torch.ones_like(logits).to(self.device))
+            loss = self.calculate_bpr_loss(acc,acc_s,acc_l, r, r_s,r_l,logits)
 
             loss.backward()
             self.optimizer.step()
