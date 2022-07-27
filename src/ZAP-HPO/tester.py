@@ -5,11 +5,15 @@ import torch
 import torch.utils.data
 
 import os
+import pickle
 import pandas as pd
+import numpy as np
 from tqdm import tqdm
-from loader import get_tr_loader,get_ts_loader
+from sklearn.metrics import ndcg_score
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
+
+from loader import get_tr_loader,get_ts_loader
 from runner import surrogate
 from utils import load_model, config_from_yaml
 
@@ -59,7 +63,7 @@ class ModelTester:
                                              num_aug = self.num_aug, num_pipelines = self.num_pipelines)
         
 
-    def test(self):
+    def predict(self):
         self.model.to(self.device)
         self.model.eval()
         pbar = tqdm(self.mtrloader_test)
@@ -73,6 +77,31 @@ class ModelTester:
             y_pred = y_pred.squeeze().tolist()
             predicted_y+=y_pred
         return predicted_y
+
+    def test(self):
+        self.model.eval()
+        self.model.to(self.device)
+
+        pbar = self.mtrloader_test
+        scores_5 = []
+        scores_10 = []
+        scores_20 = []
+        ranks = []
+        values = []
+        with torch.no_grad():
+          for i,(x,acc) in enumerate(pbar):
+            x = x.to(self.device)
+            y = acc.to(self.device).tolist()
+            y_pred = self.model.forward(x)
+            y_pred = y_pred.squeeze().tolist()
+            scores_5.append(ndcg_score(y_true=np.array(y).reshape(1,-1),y_score=np.maximum(1e-7,np.array(y_pred)).reshape(1,-1),k=5))
+            scores_10.append(ndcg_score(y_true=np.array(y).reshape(1,-1),y_score=np.maximum(1e-7,np.array(y_pred)).reshape(1,-1),k=10))
+            scores_20.append(ndcg_score(y_true=np.array(y).reshape(1,-1),y_score=np.maximum(1e-7,np.array(y_pred)).reshape(1,-1),k=20))
+            ranks.append(self.mtrloader_test.dataset.ranks[i][np.argmax(y_pred)])
+            values.append(self.mtrloader_test.dataset.values[i][np.argmax(y_pred)])
+         
+        return np.mean(ranks),np.mean(values), {"NDCG@5":np.mean(scores_5),"NDCG@10":np.mean(scores_10),"NDCG@20":np.mean(scores_20)}
+
 
 
     @staticmethod
@@ -129,9 +158,19 @@ if __name__=="__main__":
     args.load_model = eval(args.load_model)
     
     runner = ModelTester(args)
-    scores  = runner.test()
+    predictions = runner.predict()
+
     names = []
     for i in runner.mtrloader_test.dataset.testing_cls:
         names += [i]*args.num_pipelines
     data = pd.DataFrame(names, columns=["dataset"])
-    data["scores"] = scores
+    data["score_predictions"] = predictions
+
+    print(data)
+
+    tecorr, teacc, tendcg = runner.test()
+    print(f"Mean test rank {tecorr}")
+    for recall, ndcg_score in tendcg.items():
+        print(f"{recall}: {ndcg_score}")
+
+    # --model_path ../ckpts/bpr/0/1 --config_path default_config.yaml
