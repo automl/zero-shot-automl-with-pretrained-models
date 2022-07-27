@@ -152,7 +152,7 @@ def setup_datasets(trainDB_obj,data_path, cv, use_meta, split_type='cv',loo_no=-
     rank_train = data[data.dataset.isin(training_cls)]["ranks"].ravel()
     rank_valid = data[data.dataset.isin(valid_cls)]["ranks"].ravel()
 
-    return (X_train, X_valid, y_train, y_valid, rank_train, rank_valid)
+    return (data, X_train, X_valid, y_train, y_valid, rank_train, rank_valid)
 
 def setup_sparsity(trainDB_obj,X_train):
     # depending on sparsity value, picks that much % from X_train along axis 0.
