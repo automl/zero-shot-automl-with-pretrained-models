@@ -109,15 +109,6 @@ class ModelRunner:
                                                                    num_pipelines = self.num_pipelines,
                                                                    batch_size = self.config['batch_size'])
 
-        if self.split_type == "loo":
-            self.mtrloader_test =  get_ts_loader(data_path = self.data_path, 
-                                                 loo = self.loo,
-                                                 input_scaler = self.mtrloader.dataset.input_scaler,
-                                                 output_scaler = self.mtrloader.dataset.output_scaler,
-                                                 use_meta = self.use_meta,
-                                                 num_aug = self.num_aug, 
-                                                 num_pipelines = self.num_pipelines)
-        
         self.model_path = construct_model_path(self.save_path, self.config_seed, self.split_type, self.loo, self.cv, 
                                                self.mode, self.weighted, self.weigh_fn, self.sparsity, self.use_meta)
         
@@ -150,12 +141,7 @@ class ModelRunner:
 
             vacorr, vaccc, vandcg = self.validation("valid")
             trcorr, tracc, trndcg = self.validation("train")
-
-            if self.split_type == "loo":
-                tecorr, teacc, tendcg = self.test()
-            else:
-                tecorr, teacc, tendcg = 0, 0, {"NDCG@5":0,"NDCG@10":0,"NDCG@20":0}
-
+ 
             if self.max_corr_dict['rank@1'] >= vacorr:
                 patience = 0
 
@@ -176,10 +162,7 @@ class ModelRunner:
             trndcg.update({"acc":tracc,
                            "rank":trcorr,
                            "loss":loss})              
-            tendcg.update({"acc":teacc,
-                           "rank":tecorr,
-                           })
-
+ 
             history["trndcg"].append(trndcg)
             history["vandcg"].append(vandcg)  
 
@@ -352,30 +335,6 @@ class ModelRunner:
                 values.append(self.mtrloader_unshuffled.dataset.values[training][i][np.argmax(y_pred)])
                 start = end
 
-        return np.mean(ranks),np.mean(values), {"NDCG@5":np.mean(scores_5),"NDCG@10":np.mean(scores_10),"NDCG@20":np.mean(scores_20)}
-
-    def test(self):
-        self.model.eval()
-        self.model.to(self.device)
-
-        pbar = self.mtrloader_test
-        scores_5 = []
-        scores_10 = []
-        scores_20 = []
-        ranks = []
-        values = []
-        with torch.no_grad():
-          for i,(x,acc) in enumerate(pbar):
-            x = x.to(self.device)
-            y = acc.to(self.device).tolist()
-            y_pred = self.model.forward(x)
-            y_pred = y_pred.squeeze().tolist()
-            scores_5.append(ndcg_score(y_true=np.array(y).reshape(1,-1),y_score=np.maximum(1e-7,np.array(y_pred)).reshape(1,-1),k=5))
-            scores_10.append(ndcg_score(y_true=np.array(y).reshape(1,-1),y_score=np.maximum(1e-7,np.array(y_pred)).reshape(1,-1),k=10))
-            scores_20.append(ndcg_score(y_true=np.array(y).reshape(1,-1),y_score=np.maximum(1e-7,np.array(y_pred)).reshape(1,-1),k=20))
-            ranks.append(self.mtrloader_test.dataset.ranks[i][np.argmax(y_pred)])
-            values.append(self.mtrloader_test.dataset.values[i][np.argmax(y_pred)])
-         
         return np.mean(ranks),np.mean(values), {"NDCG@5":np.mean(scores_5),"NDCG@10":np.mean(scores_10),"NDCG@20":np.mean(scores_20)}
 
 
