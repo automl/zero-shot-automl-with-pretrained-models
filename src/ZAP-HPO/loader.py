@@ -148,7 +148,9 @@ def setup_datasets(trainDB_obj,data_path, cv, use_meta, split_type='cv',loo_no=-
     rank_train = data[data.dataset.isin(training_cls)]["ranks"].ravel()
     rank_valid = data[data.dataset.isin(valid_cls)]["ranks"].ravel()
 
-    return (data, X_train, X_valid, y_train, y_valid, rank_train, rank_valid)
+    print("Loaded and processed the meta-dataset!")
+
+    return (X_train, X_valid, y_train, y_valid, rank_train, rank_valid)
 
 def setup_sparsity(trainDB_obj,X_train):
     # depending on sparsity value, picks that much % from X_train along axis 0.
@@ -244,7 +246,7 @@ class TrainDatabaseCV(TrainDatabase):
         self.rng2 = np.random.default_rng(seed)
         self.valid_rng = np.random.default_rng(seed)
 
-        data, X_train, X_valid, y_train, y_valid, rank_train, rank_valid = setup_datasets(self, data_path, cv, use_meta)
+        X_train, X_valid, y_train, y_valid, rank_train, rank_valid = setup_datasets(self, data_path, cv, use_meta)
         self.dense_idx, X_train = setup_sparsity(self,X_train)
 
         self.ndatasets = {"train": X_train.shape[0]//num_pipelines, "valid": X_valid.shape[0]//num_pipelines}
@@ -265,6 +267,8 @@ class TrainDatabaseCV(TrainDatabase):
 
         setup_sparse_y_star(self, num_pipelines)
         setup_mode(self, mode, y_train)
+
+        
 
 class TrainDatabaseCVPlusLoo(TrainDatabase):
     def __init__(self, seed, data_path, cv, loo, mode = "bpr", sparsity = 0., use_meta = True, num_aug = 15, num_pipelines = 525, output_normalization = True, input_normalization = True):
@@ -315,6 +319,8 @@ def get_tr_loader(seed, data_path, mode = "bpr", split_type="cv", cv = 1, loo = 
 
     unshuffled_loader = DataLoader(dataset = copy.deepcopy(dataset), batch_size = num_pipelines, shuffle = False)
     unshuffled_loader.dataset.mode="regression"
+
+    print("Data setup done!")
 
     return loader, unshuffled_loader
 
