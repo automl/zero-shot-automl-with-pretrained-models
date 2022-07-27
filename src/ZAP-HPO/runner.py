@@ -64,6 +64,7 @@ class ModelRunner:
 
         self.args = args
         self.seed = args.seed
+        self.config_seed = args.config_seed
         self.data_path = args.data_path
         self.max_epoch = args.max_epoch
         self.save_epoch = args.save_epoch
@@ -83,7 +84,7 @@ class ModelRunner:
         self.max_corr_dict = {'rank@1': np.inf, 'epoch': -1, "ndcg@5":-1, "ndcg@10":-1, "ndcg@20":-1}
         # check for args.config_path
         if args.config_path is None:
-            cs = self.get_configspace(self.seed)
+            cs = self.get_configspace(self.config_seed)
             config = cs.sample_configuration()
         else:
             config = config_from_yaml(args.config_path)
@@ -119,9 +120,9 @@ class ModelRunner:
             extra += f"-function-{self.fn}" if self.weighted else ""
 
         if self.split_type!="loo":
-            self.model_path = os.path.join(self.save_path, f"{'weighted-' if self.weighted else ''}{self.mode}{extra}", str(self.seed), str(self.cv))
+            self.model_path = os.path.join(self.save_path, f"{'weighted-' if self.weighted else ''}{self.mode}{extra}", str(self.config_seed), str(self.cv))
         else:
-            self.model_path = os.path.join(self.save_path+"-cvplusloo", f"{'weighted-' if self.weighted else ''}{self.mode}{extra}", str(self.seed), str(self.loo),str(self.cv))
+            self.model_path = os.path.join(self.save_path+"-cvplusloo", f"{'weighted-' if self.weighted else ''}{self.mode}{extra}", str(self.config_seed), str(self.loo),str(self.cv))
         
         os.makedirs(self.model_path,exist_ok=True)
         self.mtrlog = Log(self.args, open(os.path.join(self.model_path, 'meta_train_predictor.log'), 'w'))
@@ -264,7 +265,7 @@ class ModelRunner:
             y_pred_s = self.model.forward(s)
             y_pred_l = self.model.forward(l) 
 
-            output_gr_smaller = nn.Sigmoid()(y_pred - y_pred_s) # batch
+            output_gr_smaller = nn.Sigmoid()(y_pred - y_pred_s)
             larger_gr_output  = nn.Sigmoid()(y_pred_l - y_pred)
             larger_gr_smaller  = nn.Sigmoid()(y_pred_l - y_pred_s)
 
@@ -410,23 +411,42 @@ if __name__=="__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--save_path', type=str, default='../ckpts', help='the path of save directory')
-    parser.add_argument('--data_path', type=str, default='../../data', help='the path of save directory')
-    parser.add_argument('--mode', type=str, default='bpr', help='training objective',choices=["regression", "bpr", "tml"])
-    parser.add_argument('--save_epoch', type=int, default=20, help='how many epochs to wait each time to save model states') 
-    parser.add_argument('--max_epoch', type=int, default=400, help='number of epochs to train')
-    parser.add_argument('--loo', type=int, default=1, help='Index of dataset [0,34] that should be removed')
-    parser.add_argument('--cv', type=int, default=1, help='Index of CV [1,5]')
-    parser.add_argument('--split_type', type=str, default="cv", help='cv|loo')
-    parser.add_argument('--weighted', type=str, default="False", choices=["True","False"])
-    parser.add_argument('--sparsity', type=float, default=0.0)
-    parser.add_argument('--use_meta', type=str, default="True", choices=["True","False"])    
-    parser.add_argument('--output_normalization', type=str, default="True", choices=["True","False"])
-    parser.add_argument('--fn', type=str, default="v0", choices=["v0","v1", "v0-rank", "v1-rank"])
-    parser.add_argument('--config_path',type=str, help='Path to config stored in yaml file. No value implies the CS will be sampled')
-    parser.add_argument('--num_aug', type=int, default=15, help='The number of ICGen augmentations per dataset')
-    parser.add_argument('--num_pipelines', type=int, default=525, help='The number of deep learning pipelines')
+    parser.add_argument('--seed', type=int, default=0, 
+                        help = "Seed for sampling from the meta-dataset")
+    parser.add_argument('--config_seed', type=int, default=0, 
+                        help="Seed for sampling a surrogate config")
+    parser.add_argument('--save_path', type=str, default='../ckpts', 
+                        help="The path of the model/log save directory")
+    parser.add_argument('--data_path', type=str, default='../../data', 
+                        help="The path of the metadata directory")
+    parser.add_argument('--mode', type=str, default='bpr', choices=["regression", "bpr", "tml"],
+                        help="Training objective. Choices: regression|bpr|tml")
+    parser.add_argument('--save_epoch', type=int, default=20, 
+                        help="How many epochs to wait each time to save model states") 
+    parser.add_argument('--max_epoch', type=int, default=400, 
+                        help="Number of epochs to train")
+    parser.add_argument('--loo', type=int, default=0, 
+                        help="Index of the core dataset [0,34] that should be removed")
+    parser.add_argument('--cv', type=int, default=1, 
+                        help="Index of CV [1,5]. Remark that this is the inner split. If LOO, respective core dataset augmentations will be removed from its CV fold.")
+    parser.add_argument('--split_type', type=str, default="cv", 
+                        help="When loo, this omits the designated core-dataset augmentations from the training procedure. Choices: cv|loo")
+    parser.add_argument('--weighted', type=str, default="False", choices=["True","False"],
+                        help="Whether to use the weighted BPR objective. Only used when the training objective is BPR.")
+    parser.add_argument('--sparsity', type=float, default=0.0,
+                        help="Proportion [0.0,1.0) of the missing values in the meta-dataset.")
+    parser.add_argument('--use_meta', type=str, default="True", choices=["True","False"],
+                        help="Whether to use the dataset meta-features.")    
+    parser.add_argument('--output_normalization', type=str, default="True", choices=["True","False"],
+                        help="")
+    parser.add_argument('--fn', type=str, default="v0", choices=["v0","v1", "v0-rank", "v1-rank"],
+                        help="BPR objective weighing fn. Only used when '--weighted' is 'True'.")
+    parser.add_argument('--config_path',type=str, 
+                        help='Path to config stored in yaml file. No value implies the CS will be sampled.')
+    parser.add_argument('--num_aug', type=int, default=15, 
+                        help="The number of ICGen augmentations per dataset.")
+    parser.add_argument('--num_pipelines', type=int, default=525, 
+                        help="The number of deep learning pipelines.")
 
     args = parser.parse_args()
     args.weighted = eval(args.weighted)
