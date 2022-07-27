@@ -1,18 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Dec  7 07:30:28 2021
 
-@author: hsjomaa
-"""
-
-try:
-    import torch
-    import torch.utils.data
-    import torch.nn as nn
-    from torch.autograd import Variable
-except:
-    raise ImportError("For this example you need to install pytorch.")
+import torch
+import torch.utils.data
+import torch.nn as nn
+from torch.autograd import Variable
 
 from sklearn.metrics import ndcg_score
 import os
@@ -21,29 +13,29 @@ import pickle
 import numpy as np
 import time
 from tqdm import tqdm
-from utils import Log,get_log,save_model, config_from_yaml
-from loader import get_tr_loader,get_ts_loader
+from utils import Log, get_log, save_model, config_from_yaml, config_to_yaml, construct_model_path
+from loader import get_tr_loader, get_ts_loader
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 
 
-class batch_mlp(nn.Module):
+class surrogate(nn.Module):
     def __init__(self, d_in, output_sizes, nonlinearity="relu", dropout=0.0):
         
-        super(batch_mlp, self).__init__()
+        super(surrogate, self).__init__()
         
-        assert(nonlinearity=="relu")
+        assert(nonlinearity == "relu")
         self.nonlinearity = nn.ReLU()
         
-        self.fc = nn.ModuleList([nn.Linear(in_features=d_in, out_features=output_sizes[0])])
+        self.fc = nn.ModuleList([nn.Linear(in_features = d_in, out_features = output_sizes[0])])
         for d_out in output_sizes[1:]:
-            self.fc.append(nn.Linear(in_features=self.fc[-1].out_features, out_features=d_out))
+            self.fc.append(nn.Linear(in_features = self.fc[-1].out_features, out_features = d_out))
 
         self.dropout = nn.Dropout(dropout)
 
         self.out_features = output_sizes[-1]
     
-    def forward(self,x):
+    def forward(self, x):
         
         for fc in self.fc[:-1]:
             x = fc(x)
@@ -52,81 +44,86 @@ class batch_mlp(nn.Module):
         x = self.fc[-1](x)
         return x
 
-def WMSE(input,target,weights):
+def WMSE(input, target, weights):
     out = (input-target)**2
     out = out * weights
     return out.mean()
 
 class ModelRunner:
-    def __init__(self,args):
+    def __init__(self, args):
 
         torch.manual_seed(args.seed)
 
         self.args = args
         self.seed = args.seed
         self.config_seed = args.config_seed
-        self.data_path = args.data_path
-        self.max_epoch = args.max_epoch
-        self.save_epoch = args.save_epoch
         self.save_path = args.save_path
+        self.data_path = args.data_path
+        self.config_path = args.config_path
+        self.save_epoch = args.save_epoch
+        self.max_epoch = args.max_epoch
+        self.mode = args.mode
+        self.weighted = args.weighted
+        self.weigh_fn = args.weigh_fn
         self.split_type = args.split_type
         self.loo =  args.loo
         self.cv = args.cv
-        self.num_aug = args.num_aug
-        self.num_pipelines = args.num_pipelines
-        self.mode = args.mode
-        self.weighted = args.weighted
         self.sparsity = args.sparsity
         self.use_meta = args.use_meta
-        self.fn = args.fn
-        self.output_normalization = args.output_normalization
+        self.num_aug = args.num_aug
+        self.num_pipelines = args.num_pipelines
+        
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.max_corr_dict = {'rank@1': np.inf, 'epoch': -1, "ndcg@5":-1, "ndcg@10":-1, "ndcg@20":-1}
+        
         # check for args.config_path
-        if args.config_path is None:
+        if self.config_path is None:
             cs = self.get_configspace(self.config_seed)
-            config = cs.sample_configuration()
+            self.config = cs.sample_configuration()
         else:
-            config = config_from_yaml(args.config_path)
+            self.config = config_from_yaml(self.config_path)
 
-        self.model = batch_mlp(d_in=39 if self.use_meta else 35, output_sizes=config["num_hidden_layers"]*[config["num_hidden_units"]]+[1], dropout=config["dropout_rate"])
+        self.model = surrogate(d_in = 39 if self.use_meta else 35, 
+                               output_sizes = self.config["num_hidden_layers"]*[self.config["num_hidden_units"]]+[1], 
+                               dropout = self.config["dropout_rate"])
         self.model.to(self.device)
         
-        if config['optimizer'] == 'Adam':
-            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=config['lr'], weight_decay = config['weight_decay'])
-        elif config['optimizer'] == 'AdamW':
-            self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=config['lr'], weight_decay = config['weight_decay'])
-        elif config['optimizer'] == 'SGD':
-            self.optimizer = torch.optim.SGD(self.model.parameters(), lr=config['lr'], momentum=config['sgd_momentum'], weight_decay = config['weight_decay'])
+        if self.config['optimizer'] == 'Adam':
+            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.config['lr'], weight_decay = self.config['weight_decay'])
+        elif self.config['optimizer'] == 'AdamW':
+            self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.config['lr'], weight_decay = self.config['weight_decay'])
+        elif self.config['optimizer'] == 'SGD':
+            self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.config['lr'], momentum = self.config['sgd_momentum'], weight_decay = self.config['weight_decay'])
 
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.max_epoch, eta_min= config["min_lr"])
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max = self.max_epoch, eta_min = self.config["min_lr"])
 
-        self.mtrloader, self.mtrloader_unshuffled =  get_tr_loader(self.seed, config['batch_size'], self.data_path, loo=self.loo, cv=self.cv,
-                                        mode=self.mode,split_type=self.split_type,sparsity =self.sparsity,
-                                        use_meta=self.use_meta, output_normalization=self.output_normalization,
-                                        num_aug = self.num_aug, num_pipelines = self.num_pipelines)
-        
+        self.mtrloader, self.mtrloader_unshuffled =  get_tr_loader(seed = self.seed, 
+                                                                   data_path = self.data_path, 
+                                                                   mode = self.mode,
+                                                                   split_type = self.split_type,
+                                                                   cv = self.cv,
+                                                                   loo = self.loo, 
+                                                                   sparsity = self.sparsity,
+                                                                   use_meta = self.use_meta,
+                                                                   num_aug = self.num_aug, 
+                                                                   num_pipelines = self.num_pipelines,
+                                                                   batch_size = self.config['batch_size'])
+
         if self.split_type == "loo":
-            self.mtrloader_test =  get_ts_loader(self.data_path, self.loo,
+            self.mtrloader_test =  get_ts_loader(data_path = self.data_path, 
+                                                 loo = self.loo,
                                                  input_scaler = self.mtrloader.dataset.input_scaler,
                                                  output_scaler = self.mtrloader.dataset.output_scaler,
-                                                 use_meta=self.use_meta,
-                                                 num_aug = self.num_aug, num_pipelines = self.num_pipelines)
+                                                 use_meta = self.use_meta,
+                                                 num_aug = self.num_aug, 
+                                                 num_pipelines = self.num_pipelines)
         
-
-        extra = f"-{self.sparsity}" if self.sparsity > 0 else ""
-        extra += "-no-meta" if not self.use_meta else ""
-        if self.mode == "bpr":
-            extra += f"-function-{self.fn}" if self.weighted else ""
-
-        if self.split_type!="loo":
-            self.model_path = os.path.join(self.save_path, f"{'weighted-' if self.weighted else ''}{self.mode}{extra}", str(self.config_seed), str(self.cv))
-        else:
-            self.model_path = os.path.join(self.save_path+"-cvplusloo", f"{'weighted-' if self.weighted else ''}{self.mode}{extra}", str(self.config_seed), str(self.loo),str(self.cv))
+        self.model_path = construct_model_path(self.save_path, self.config_seed, self.split_type, self.loo, self.cv, 
+                                               self.mode, self.weighted, self.weigh_fn, self.sparsity, self.use_meta)
         
-        os.makedirs(self.model_path,exist_ok=True)
+        os.makedirs(self.model_path, exist_ok=True)
         self.mtrlog = Log(self.args, open(os.path.join(self.model_path, 'meta_train_predictor.log'), 'w'))
-        self.mtrlog.print_args(config)  
+        self.mtrlog.print_args(self.config)  
 
         with open(os.path.join(self.model_path, "input_scaler.pt"), 'wb') as f:
             pickle.dump(self.mtrloader.dataset.input_scaler, f) 
@@ -134,27 +131,28 @@ class ModelRunner:
         with open(os.path.join(self.model_path, "output_scaler.pt"), 'wb') as f:
             pickle.dump(self.mtrloader.dataset.output_scaler, f) 
 
+        config_to_yaml(os.path.join(self.model_path, "model_config.yaml"), self.config)
     
     def train(self):
         history = {"trndcg": [], "vandcg": []}
         for epoch in range(1, self.max_epoch + 1):
             self.mtrlog.ep_sttime = time.time()
             if self.mode=="regression":
-                loss = self.train_epoch(epoch)  
+                loss = self.train_epoch()  
             elif self.mode=="bpr":
-                loss = self.train_bpr_epoch(epoch)
+                loss = self.train_bpr_epoch()
             elif self.mode=="tml":
-                loss = self.train_tml_epoch(epoch)
+                loss = self.train_tml_epoch()
 
             self.scheduler.step()
 
             self.mtrlog.print_pred_log(loss, 0, 'train', epoch=epoch)
 
-            vacorr, vaccc, vandcg = self.validation(epoch, "valid")
-            trcorr, tracc, trndcg = self.validation(epoch, "train")
+            vacorr, vaccc, vandcg = self.validation("valid")
+            trcorr, tracc, trndcg = self.validation("train")
 
             if self.split_type == "loo":
-                tecorr, teacc, tendcg = self.test(epoch)
+                tecorr, teacc, tendcg = self.test()
             else:
                 tecorr, teacc, tendcg = 0, 0, {"NDCG@5":0,"NDCG@10":0,"NDCG@20":0}
 
@@ -193,7 +191,7 @@ class ModelRunner:
 
         return history
         
-    def train_epoch(self, epoch):
+    def train_epoch(self):
         self.model.train()
         self.model.to(self.device)
 
@@ -222,21 +220,21 @@ class ModelRunner:
     
         return trloss/dlen
 
-    def calculate_bpr_loss(self,acc,acc_s,acc_l, r, r_s,r_l,logits):
+    def calculate_bpr_loss(self, acc, acc_s, acc_l, r, r_s, r_l,logits):
         if self.weighted:
-            if self.fn == "v0":
+            if self.weigh_fn == "v0":
                 weights = torch.cat([torch.exp(-(acc - acc_s).pow(2)),
                                      torch.exp(-(acc_s - acc).pow(2)),
                                      torch.exp(-(acc_l - acc_s).pow(2))], 0)
-            elif self.fn == "v1":
+            elif self.weigh_fn == "v1":
                 weights = torch.cat([(acc - acc_s).pow(2),
                                      (acc_l - acc).pow(2),
                                      (acc_l - acc_s).pow(2)], 0)
-            elif self.fn == "v0-rank":
+            elif self.weigh_fn == "v0-rank":
                 weights = torch.cat([torch.exp(-((r - r_s)).pow(2)),
                                      torch.exp(-((r_l - r)).pow(2)),
                                      torch.exp(-((r_l - r_s)).pow(2))], 0)
-            elif self.fn == "v1-rank":
+            elif self.weigh_fn == "v1-rank":
                 weights = torch.cat([((r - r_s)).pow(2),
                                      ((r_l - r)).pow(2),
                                      ((r_l - r_s)).pow(2)], 0)
@@ -245,7 +243,7 @@ class ModelRunner:
         else:
             return nn.BCELoss()(logits, torch.ones_like(logits).to(self.device))
 
-    def train_bpr_epoch(self, epoch):
+    def train_bpr_epoch(self):
         self.model.train()
         self.model.to(self.device)
 
@@ -253,7 +251,7 @@ class ModelRunner:
         trloss = 0
         pbar = self.mtrloader
 
-        for (x, s, l), (acc,acc_s,acc_l), (r,r_s,r_l) in pbar:
+        for (x, s, l), (acc, acc_s, acc_l), (r, r_s, r_l) in pbar:
             
             x = x.to(self.device)
             s = s.to(self.device)
@@ -271,7 +269,7 @@ class ModelRunner:
 
             logits = torch.cat([output_gr_smaller,larger_gr_output,larger_gr_smaller], 0) # concatenates end to end
 
-            loss = self.calculate_bpr_loss(acc,acc_s,acc_l, r, r_s,r_l,logits)
+            loss = self.calculate_bpr_loss(acc, acc_s, acc_l, r, r_s, r_l, logits)
 
             loss.backward()
             self.optimizer.step()
@@ -281,7 +279,7 @@ class ModelRunner:
 
         return trloss/dlen
 
-    def train_tml_epoch(self, epoch, margin = 1.0):
+    def train_tml_epoch(self, margin = 1.0):
         self.model.train()
         self.model.to(self.device)
 
@@ -313,7 +311,7 @@ class ModelRunner:
 
         return trloss/dlen    
 
-    def validation(self, epoch, training):
+    def validation(self, training):
         self.model.eval()
         self.model.to(self.device)
 
@@ -356,7 +354,7 @@ class ModelRunner:
 
         return np.mean(ranks),np.mean(values), {"NDCG@5":np.mean(scores_5),"NDCG@10":np.mean(scores_10),"NDCG@20":np.mean(scores_20)}
 
-    def test(self, epoch):
+    def test(self):
         self.model.eval()
         self.model.to(self.device)
 
@@ -419,30 +417,28 @@ if __name__=="__main__":
                         help="The path of the model/log save directory")
     parser.add_argument('--data_path', type=str, default='../../data', 
                         help="The path of the metadata directory")
-    parser.add_argument('--mode', type=str, default='bpr', choices=["regression", "bpr", "tml"],
-                        help="Training objective. Choices: regression|bpr|tml")
+    parser.add_argument('--config_path',type=str, 
+                        help='Path to config stored in yaml file. No value implies the CS will be sampled.')
     parser.add_argument('--save_epoch', type=int, default=20, 
                         help="How many epochs to wait each time to save model states") 
     parser.add_argument('--max_epoch', type=int, default=400, 
                         help="Number of epochs to train")
+    parser.add_argument('--mode', type=str, default='bpr', choices=["regression", "bpr", "tml"],
+                        help="Training objective. Choices: regression|bpr|tml")
+    parser.add_argument('--weighted', type=str, default="False", choices=["True","False"],
+                        help="Whether to use the weighted objective. Only used when the training objective is regression or BPR.")
+    parser.add_argument('--weigh_fn', type=str, default="v0", choices=["v0","v1", "v0-rank", "v1-rank"],
+                        help="BPR objective weighing fn. Only used when '--weighted' is 'True'.")
+    parser.add_argument('--split_type', type=str, default="cv", 
+                        help="When loo, this omits the designated core-dataset augmentations from the training procedure. Choices: cv|loo")
     parser.add_argument('--loo', type=int, default=0, 
                         help="Index of the core dataset [0,34] that should be removed")
     parser.add_argument('--cv', type=int, default=1, 
                         help="Index of CV [1,5]. Remark that this is the inner split. If LOO, respective core dataset augmentations will be removed from its CV fold.")
-    parser.add_argument('--split_type', type=str, default="cv", 
-                        help="When loo, this omits the designated core-dataset augmentations from the training procedure. Choices: cv|loo")
-    parser.add_argument('--weighted', type=str, default="False", choices=["True","False"],
-                        help="Whether to use the weighted BPR objective. Only used when the training objective is BPR.")
     parser.add_argument('--sparsity', type=float, default=0.0,
                         help="Proportion [0.0,1.0) of the missing values in the meta-dataset.")
     parser.add_argument('--use_meta', type=str, default="True", choices=["True","False"],
                         help="Whether to use the dataset meta-features.")    
-    parser.add_argument('--output_normalization', type=str, default="True", choices=["True","False"],
-                        help="")
-    parser.add_argument('--fn', type=str, default="v0", choices=["v0","v1", "v0-rank", "v1-rank"],
-                        help="BPR objective weighing fn. Only used when '--weighted' is 'True'.")
-    parser.add_argument('--config_path',type=str, 
-                        help='Path to config stored in yaml file. No value implies the CS will be sampled.')
     parser.add_argument('--num_aug', type=int, default=15, 
                         help="The number of ICGen augmentations per dataset.")
     parser.add_argument('--num_pipelines', type=int, default=525, 
@@ -451,7 +447,6 @@ if __name__=="__main__":
     args = parser.parse_args()
     args.weighted = eval(args.weighted)
     args.use_meta = eval(args.use_meta)
-    args.output_normalization = eval(args.output_normalization)
 
     runner = ModelRunner(args)
     history = runner.train()

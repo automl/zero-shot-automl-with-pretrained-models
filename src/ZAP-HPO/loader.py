@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Dec  7 13:59:03 2021
 
-@author: hsjomaa
-"""
 import torch
 from torch.utils.data import Dataset,DataLoader
 import pandas as pd
@@ -35,7 +31,7 @@ class TestDatabase(Dataset):
   def __init__(self, data_path, loo, input_scaler = None, output_scaler = None, use_meta=True, num_aug = 15, num_pipelines = 525):
     
     # read data
-    data =pd.read_csv(os.path.join(data_path, "data_m.csv"), header=0)
+    data = pd.read_csv(os.path.join(data_path, "data_m.csv"), header=0)
 
     with open(os.path.join(data_path,"cls_names.pkl"),"rb") as f:
         self.cls = pickle.load(f)
@@ -237,8 +233,7 @@ def setup_mode(trainDB_obj, mode, y_train):
             trainDB_obj.smaller_set.append(ss)
 
 class TrainDatabaseCV(TrainDatabase):
-    def __init__(self, seed, data_path, cv, output_normalization=False, input_normalization=True, mode="regression",
-                 sparsity = 0., use_meta=True, num_pipelines = 525):
+    def __init__(self, seed, data_path, cv, mode = "bpr", sparsity = 0., use_meta = True, num_pipelines = 525, output_normalization = True, input_normalization = True):
         super(TrainDatabase, self).__init__()
         self.training = "train"
         self.output_normalization = output_normalization
@@ -272,7 +267,7 @@ class TrainDatabaseCV(TrainDatabase):
         setup_mode(self, mode, y_train)
 
 class TrainDatabaseCVPlusLoo(TrainDatabase):
-    def __init__(self, seed, data_path, loo, cv, output_normalization=False, input_normalization=True, mode="regression", sparsity = 0., use_meta=True, num_aug = 15, num_pipelines = 525):
+    def __init__(self, seed, data_path, cv, loo, mode = "bpr", sparsity = 0., use_meta = True, num_aug = 15, num_pipelines = 525, output_normalization = True, input_normalization = True):
         super(TrainDatabase, self).__init__()
         self.training = "train"
         self.output_normalization = output_normalization
@@ -307,24 +302,24 @@ class TrainDatabaseCVPlusLoo(TrainDatabase):
         setup_sparse_y_star(self, num_pipelines)
         setup_mode(self, mode, y_train)
 
-def get_tr_loader(seed, batch_size, data_path, loo, mode, use_meta=True, cv=None, split_type="cv", sparsity = 0, output_normalization = True, num_aug = 15, num_pipelines = 525):
+def get_tr_loader(seed, data_path, mode = "bpr", split_type="cv", cv = 1, loo = None, sparsity = 0, use_meta=True, num_aug = 15, num_pipelines = 525, batch_size = 64):
 
     if split_type=="cv":
-        dataset = TrainDatabaseCV(seed, data_path, cv=cv, mode=mode, sparsity = sparsity, use_meta=use_meta, output_normalization = output_normalization, num_pipelines = num_pipelines)
+        dataset = TrainDatabaseCV(seed, data_path, cv, mode, sparsity, use_meta, num_pipelines)
     elif split_type=="loo":
-        dataset = TrainDatabaseCVPlusLoo(seed, data_path, cv=cv, loo=loo, mode=mode, sparsity=sparsity, output_normalization = output_normalization, use_meta=use_meta, num_aug = num_aug, num_pipelines = num_pipelines)
+        dataset = TrainDatabaseCVPlusLoo(seed, data_path, cv, loo, mode, sparsity, use_meta, num_aug, num_pipelines)
     else:
         print("Please provide a valid split type {cv|loo}")
 
-    loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
+    loader = DataLoader(dataset = dataset, batch_size = batch_size, shuffle = True)
 
-    unshuffled_loader = DataLoader(dataset=copy.deepcopy(dataset), batch_size=num_pipelines, shuffle=False)
+    unshuffled_loader = DataLoader(dataset = copy.deepcopy(dataset), batch_size = num_pipelines, shuffle = False)
     unshuffled_loader.dataset.mode="regression"
 
     return loader, unshuffled_loader
 
 def get_ts_loader(data_path, loo, input_scaler = None, output_scaler = None, use_meta=True, num_aug = 15, num_pipelines = 525):
-    dataset = TestDatabase(data_path, loo, input_scaler = input_scaler, output_scaler = output_scaler, use_meta=use_meta, num_aug = num_aug, num_pipelines = num_pipelines)
-    loader = DataLoader(dataset=dataset, batch_size=num_pipelines, shuffle=False)
+    dataset = TestDatabase(data_path, loo, input_scaler, output_scaler, use_meta, num_aug, num_pipelines)
+    loader = DataLoader(dataset = dataset, batch_size = num_pipelines, shuffle = False)
     return loader    
 
