@@ -115,7 +115,6 @@ class ModelRunner:
 
         extra = f"-{self.sparsity}" if self.sparsity > 0 else ""
         extra += "-no-meta" if not self.use_meta else ""
-        extra += "-normalized" if not self.output_normalization else ""
         if self.mode == "bpr":
             extra += f"-function-{self.fn}" if self.weighted else ""
 
@@ -412,7 +411,7 @@ if __name__=="__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--save_path', type=str, default='../ckpts_norm', help='the path of save directory')
+    parser.add_argument('--save_path', type=str, default='../ckpts', help='the path of save directory')
     parser.add_argument('--data_path', type=str, default='../../data', help='the path of save directory')
     parser.add_argument('--mode', type=str, default='bpr', help='training objective',choices=["regression", "bpr", "tml"])
     parser.add_argument('--save_epoch', type=int, default=20, help='how many epochs to wait each time to save model states') 
