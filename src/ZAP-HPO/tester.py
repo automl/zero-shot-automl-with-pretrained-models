@@ -47,10 +47,10 @@ class ModelTester:
         if self.load_model:
             load_model(self.model, device=self.device, model_path = self.model_path)
 
-            with open(os.path.join(self.model_path, "input_scaler.pt"), 'rb') as f:
+            with open(os.path.join(self.model_path, "input_scaler.pkl"), 'rb') as f:
                 self.input_scaler = pickle.load(f) 
 
-            with open(os.path.join(self.model_path, "output_scaler.pt"), 'rb') as f:
+            with open(os.path.join(self.model_path, "output_scaler.pkl"), 'rb') as f:
                 self.output_scaler = pickle.load(f)
         else:
             self.input_scaler = None
@@ -165,8 +165,6 @@ if __name__=="__main__":
         names += [i]*args.num_pipelines
     data = pd.DataFrame(names, columns=["dataset"])
     data["score_predictions"] = predictions
-
-    print(data)
 
     tecorr, teacc, tendcg = runner.test()
     print(f"Mean test rank {tecorr}")

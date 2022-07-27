@@ -157,17 +157,17 @@ def setup_sparsity(trainDB_obj,X_train):
     # Default would be whole array size X_train.shape[0] for 0 sparsity
     # Value is then sorted and set
     if trainDB_obj.sparsity > 0:
-        dense_idx = trainDB_obj.rng2.choice(X_train.shape[0], int((1 - trainDB_obj.sparsity) * X_train.shape[0]), replace=False)
-        dense_idx.sort()
+        trainDB_obj.dense_idx = trainDB_obj.rng2.choice(X_train.shape[0], int((1 - trainDB_obj.sparsity) * X_train.shape[0]), replace=False)
+        trainDB_obj.dense_idx.sort()
         X_train = X_train[trainDB_obj.dense_idx]
-        return dense_idx, X_train
+        return X_train
     else:
-        return np.arange(X_train.shape[0]), X_train  # default 0 case does no sorting
+        trainDB_obj.dense_idx = np.arange(X_train.shape[0])
+        return X_train  # default 0 case does no sorting
 
 def setup_normalisation(trainDB_obj, input_normalization, output_normalization,X_train, X_valid, y_train, y_valid):
     if input_normalization:
         len_bool_cat = len(_bool_hps + _categorical_hps)
-
         trainDB_obj.input_scaler = StandardScaler()
         trainDB_obj.input_scaler.fit(X_train[:, :-len_bool_cat])
 
@@ -182,6 +182,8 @@ def setup_normalisation(trainDB_obj, input_normalization, output_normalization,X
     if output_normalization:
         trainDB_obj.output_scaler = StandardScaler()
         trainDB_obj.output_scaler.fit(y_train.reshape(-1, 1))
+        # TODO
+        # trainDB_obj.output_scaler.fit(y_train.reshape(-1, trainDB_obj.num_pipelines)) 
 
         y_train = trainDB_obj.output_scaler.transform(y_train.reshape(-1, 1)).reshape(-1)
         y_valid = trainDB_obj.output_scaler.transform(y_valid.reshape(-1, 1)).reshape(-1)
@@ -226,6 +228,7 @@ def setup_sparse_y_star(trainDB_obj,num_pipelines):
 def setup_mode(trainDB_obj, mode, y_train):
     y_train = y_train if trainDB_obj.sparsity == 0 else y_train[trainDB_obj.dense_idx]
     if mode == "bpr" or mode == "tml":
+        print(f"Setting up pairwise rankings for the {mode} objective. Might take few minutes!")
         trainDB_obj.larger_set = []
         trainDB_obj.smaller_set = []
         for d, k in enumerate(y_train):
@@ -245,13 +248,16 @@ class TrainDatabaseCV(TrainDatabase):
         self.rng = np.random.default_rng(seed)
         self.rng2 = np.random.default_rng(seed)
         self.valid_rng = np.random.default_rng(seed)
+        self.num_pipelines = num_pipelines
 
         X_train, X_valid, y_train, y_valid, rank_train, rank_valid = setup_datasets(self, data_path, cv, use_meta)
-        self.dense_idx, X_train = setup_sparsity(self,X_train)
 
         self.ndatasets = {"train": X_train.shape[0]//num_pipelines, "valid": X_valid.shape[0]//num_pipelines}
 
-        X_train, X_valid, y_train, y_valid = setup_normalisation(self, input_normalization, output_normalization,X_train, X_valid, y_train, y_valid)
+        X_train = setup_sparsity(self, X_train)
+
+        X_train, X_valid, y_train, y_valid = setup_normalisation(self, input_normalization, output_normalization, X_train, X_valid, y_train, y_valid)
+        
         self.x = {"train":torch.tensor(X_train.astype(np.float32)),
                   "valid":torch.tensor(X_valid.astype(np.float32))}
         self.y = {"train":torch.tensor(y_train.astype(np.float32)),
@@ -266,9 +272,8 @@ class TrainDatabaseCV(TrainDatabase):
         self.ds_ref = np.concatenate([num_pipelines*[i] for i in range(self.ndatasets["train"])])
 
         setup_sparse_y_star(self, num_pipelines)
-        setup_mode(self, mode, y_train)
+        setup_mode(self, mode, y_train) # This takes a lot of time
 
-        
 
 class TrainDatabaseCVPlusLoo(TrainDatabase):
     def __init__(self, seed, data_path, cv, loo, mode = "bpr", sparsity = 0., use_meta = True, num_aug = 15, num_pipelines = 525, output_normalization = True, input_normalization = True):

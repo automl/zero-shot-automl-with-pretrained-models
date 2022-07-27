@@ -8,7 +8,6 @@ from torch.autograd import Variable
 
 from sklearn.metrics import ndcg_score
 import os
-import json
 import pickle
 import numpy as np
 import time
@@ -116,10 +115,10 @@ class ModelRunner:
         self.mtrlog = Log(self.args, open(os.path.join(self.model_path, 'meta_train_predictor.log'), 'w'))
         self.mtrlog.print_args(self.config)  
 
-        with open(os.path.join(self.model_path, "input_scaler.pt"), 'wb') as f:
+        with open(os.path.join(self.model_path, "input_scaler.pkl"), 'wb') as f:
             pickle.dump(self.mtrloader.dataset.input_scaler, f) 
 
-        with open(os.path.join(self.model_path, "output_scaler.pt"), 'wb') as f:
+        with open(os.path.join(self.model_path, "output_scaler.pkl"), 'wb') as f:
             pickle.dump(self.mtrloader.dataset.output_scaler, f) 
 
         config_to_yaml(os.path.join(self.model_path, "model_config.yaml"), self.config)
@@ -166,9 +165,10 @@ class ModelRunner:
             history["trndcg"].append(trndcg)
             history["vandcg"].append(vandcg)  
 
-            history_path = os.path.join(self.model_path, "history.json")      
-            with open(history_path, 'w') as f:
-                json.dump(history, f)  
+            history_path = os.path.join(self.model_path, "history.pkl")      
+
+            with open(history_path, 'wb') as f:
+                pickle.dump(history, f)  
 
         self.mtrlog.save_time_log()
 
@@ -410,7 +410,7 @@ if __name__=="__main__":
     runner = ModelRunner(args)
     history = runner.train()
 
-    history_path = os.path.join(runner.model_path, "history.json")      
-    with open(history_path, 'w') as f:
-        json.dump(history, f)
+    history_path = os.path.join(runner.model_path, "history.pkl")      
+    with open(history_path, 'wb') as f:
+        pickle.dump(history, f)
 
