@@ -377,7 +377,7 @@ if __name__=="__main__":
                         help="Seed for sampling a surrogate config")
     parser.add_argument('--save_path', type=str, default='../ckpts', 
                         help="The path of the model/log save directory")
-    parser.add_argument('--data_path', type=str, default='../../data', 
+    parser.add_argument('--data_path', type=str, default='../../data/meta_dataset', 
                         help="The path of the metadata directory")
     parser.add_argument('--config_path',type=str, default = "default_config.yaml",
                         help='Path to config stored in yaml file. No value implies the CS will be sampled.')
