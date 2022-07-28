@@ -50,7 +50,7 @@ Change the array job arguments filename to *submission/ARGS_JOBFILE_PATH* and (o
                                          --experiment_group_dir ../../data/per_icgen_augmentation_hpo 
   ```
 
-The directory `../../data/configs/configs/kakaobrain_optimized_per_icgen_augmentation` contains a `.yaml` file for each incumbent pipeline.
+The directory `../../data/configs/kakaobrain_optimized_per_icgen_augmentation` contains a `.yaml` file for each incumbent pipeline.
 
 ### 1.2. Creation of the performance matrix
   
@@ -88,8 +88,6 @@ Change the array job arguments filename to *submission/ARGS_JOBFILE_PATH* and (o
   ```
 
 This results in a performance matrix `.csv` and `.pkl` files under `META_DATASET_OUTPUT_DIR`.
-
-ADD: Perf matrix heatmap
 
 ## 1.3. Precomputing meta-features
 
