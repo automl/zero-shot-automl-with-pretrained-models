@@ -8,7 +8,7 @@ import os
 import pickle
 import numpy as np
 import copy
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 _list_of_metafeatures = ['num_channels', 'num_classes', 'num_train', 'resolution_0']
 _bool_hps = ["first_simple_model", "amsgrad", "nesterov"]
@@ -37,6 +37,8 @@ class TestDatabase(Dataset):
         self.cls = pickle.load(f)
     
     testing_cls = [f"{i}-{self.cls[loo]}" for i in range(num_aug)]
+
+    print(f"Testing on {num_aug} augmentations of {self.cls[loo]}")
 
     # process input
     predictors  = _list_of_metafeatures+_numerical_hps+_bool_hps+_categorical_hps if use_meta else _numerical_hps+_bool_hps+_categorical_hps
@@ -165,7 +167,7 @@ def setup_sparsity(trainDB_obj,X_train):
         trainDB_obj.dense_idx = np.arange(X_train.shape[0])
         return X_train  # default 0 case does no sorting
 
-def setup_normalisation(trainDB_obj, input_normalization, output_normalization,X_train, X_valid, y_train, y_valid):
+def setup_normalisation(trainDB_obj, input_normalization, output_normalization, X_train, X_valid, y_train, y_valid):
     if input_normalization:
         len_bool_cat = len(_bool_hps + _categorical_hps)
         trainDB_obj.input_scaler = StandardScaler()
@@ -178,15 +180,20 @@ def setup_normalisation(trainDB_obj, input_normalization, output_normalization,X
         X_valid = np.concatenate(
             [trainDB_obj.input_scaler.transform(X_valid[:, :-len_bool_cat]), X_valid[:, X_train.shape[1] - len_bool_cat:]],
             axis=1)
+    else:
+        trainDB_obj.input_scaler = None
+
 
     if output_normalization:
-        trainDB_obj.output_scaler = StandardScaler()
+        
+        trainDB_obj.output_scaler = StandardScaler() 
         trainDB_obj.output_scaler.fit(y_train.reshape(-1, 1))
-        # TODO
-        # trainDB_obj.output_scaler.fit(y_train.reshape(-1, trainDB_obj.num_pipelines)) 
-
+        
         y_train = trainDB_obj.output_scaler.transform(y_train.reshape(-1, 1)).reshape(-1)
         y_valid = trainDB_obj.output_scaler.transform(y_valid.reshape(-1, 1)).reshape(-1)
+
+    else:
+        trainDB_obj.output_scaler = None
 
     return (X_train, X_valid, y_train, y_valid)
 
@@ -238,7 +245,7 @@ def setup_mode(trainDB_obj, mode, y_train):
             trainDB_obj.smaller_set.append(ss)
 
 class TrainDatabaseCV(TrainDatabase):
-    def __init__(self, seed, data_path, cv, mode = "bpr", sparsity = 0., use_meta = True, num_pipelines = 525, output_normalization = True, input_normalization = True):
+    def __init__(self, seed, data_path, cv, mode = "bpr", sparsity = 0., use_meta = True, num_pipelines = 525,  input_normalization = True, output_normalization = False):
         super(TrainDatabase, self).__init__()
         self.training = "train"
         self.output_normalization = output_normalization
@@ -276,7 +283,7 @@ class TrainDatabaseCV(TrainDatabase):
 
 
 class TrainDatabaseCVPlusLoo(TrainDatabase):
-    def __init__(self, seed, data_path, cv, loo, mode = "bpr", sparsity = 0., use_meta = True, num_aug = 15, num_pipelines = 525, output_normalization = True, input_normalization = True):
+    def __init__(self, seed, data_path, cv, loo, mode = "bpr", sparsity = 0., use_meta = True, num_aug = 15, num_pipelines = 525, input_normalization = True, output_normalization = False):
         super(TrainDatabase, self).__init__()
         self.training = "train"
         self.output_normalization = output_normalization
@@ -290,7 +297,8 @@ class TrainDatabaseCVPlusLoo(TrainDatabase):
         X_train, X_valid, y_train, y_valid, rank_train, rank_valid = setup_datasets(self,data_path,cv,use_meta,split_type='loo',loo_no=loo,num_aug=num_aug)
 
         self.ndatasets = {"train": X_train.shape[0]//num_pipelines, "valid": X_valid.shape[0]//num_pipelines}
-        self.dense_idx, X_train = setup_sparsity(self, X_train)
+        
+        X_train = setup_sparsity(self, X_train)
 
         X_train, X_valid, y_train, y_valid = setup_normalisation(self, input_normalization, output_normalization, X_train,
                                                                  X_valid, y_train, y_valid)

@@ -140,12 +140,12 @@ if __name__=="__main__":
                         help="The full path of the model parent directory.")
     parser.add_argument('--data_path', type=str, default='../../data', 
                         help="The path of the metadata directory")
-    parser.add_argument('--config_path',type=str, 
+    parser.add_argument('--config_path',type=str, default = "default_config.yaml", 
                         help='Path to config stored in yaml file. No value implies the CS will be sampled.')
     parser.add_argument('--load_model', type=str, default="True", choices=["True","False"],
                         help="Used for debugging purposes without having a model state.")
     parser.add_argument('--loo', type=int, default=0, 
-                        help="Index of the core dataset [0,34] that should be removed")
+                        help="Index of the core dataset [0,34] that was removed and should be tested here.")
     parser.add_argument('--use_meta', type=str, default="True", choices=["True","False"],
                         help="Whether to use the dataset meta-features.")    
     parser.add_argument('--num_aug', type=int, default=15, 
@@ -164,11 +164,12 @@ if __name__=="__main__":
     for i in runner.mtrloader_test.dataset.testing_cls:
         names += [i]*args.num_pipelines
     data = pd.DataFrame(names, columns=["dataset"])
-    data["score_predictions"] = predictions
+    data["predictions"] = predictions
 
     tecorr, teacc, tendcg = runner.test()
-    print(f"Mean test rank {tecorr}")
+    print(f"Mean test rank: {tecorr}")
     for recall, ndcg_score in tendcg.items():
         print(f"{recall}: {ndcg_score}")
 
-    # --model_path ../ckpts/bpr/0/1 --config_path default_config.yaml
+    # --model_path ../ckpts/bpr/default_config/1
+    # --model_path ../ckpts-cvplusloo/bpr/default_config/0/1 --loo 0

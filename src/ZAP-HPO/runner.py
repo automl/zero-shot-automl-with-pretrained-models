@@ -79,8 +79,10 @@ class ModelRunner:
         if self.config_path is None:
             cs = self.get_configspace(self.config_seed)
             self.config = cs.sample_configuration()
+            self.config_identifier = "seed-"+str(self.config_seed)
         else:
             self.config = config_from_yaml(self.config_path)
+            self.config_identifier = self.config_path.split("/")[-1].split(".yaml")[0]
 
         self.model = surrogate(d_in = 39 if self.use_meta else 35, 
                                output_sizes = self.config["num_hidden_layers"]*[self.config["num_hidden_units"]]+[1], 
@@ -108,7 +110,8 @@ class ModelRunner:
                                                                    num_pipelines = self.num_pipelines,
                                                                    batch_size = self.config['batch_size'])
 
-        self.model_path = construct_model_path(self.save_path, self.config_seed, self.split_type, self.loo, self.cv, 
+
+        self.model_path = construct_model_path(self.save_path, self.config_identifier, self.split_type, self.loo, self.cv, 
                                                self.mode, self.weighted, self.weigh_fn, self.sparsity, self.use_meta)
         
         os.makedirs(self.model_path, exist_ok=True)
@@ -376,7 +379,7 @@ if __name__=="__main__":
                         help="The path of the model/log save directory")
     parser.add_argument('--data_path', type=str, default='../../data', 
                         help="The path of the metadata directory")
-    parser.add_argument('--config_path',type=str, 
+    parser.add_argument('--config_path',type=str, default = "default_config.yaml",
                         help='Path to config stored in yaml file. No value implies the CS will be sampled.')
     parser.add_argument('--save_epoch', type=int, default=20, 
                         help="How many epochs to wait each time to save model states") 
