@@ -11,9 +11,10 @@ Our data can be downloaded under the following links:
 * Models (~700M): https://bit.ly/3BhIAGB
 * Meta-dataset (~2.5M): https://bit.ly/3NnhP8W 
 
-and should be placed under `.data/datasets`, `.data/models`, `.data/meta_dataset`. 
+Create a data folder `mkdir data`.
+Extract and place the folders as `.data/datasets`, `.data/models`, `.data/meta_dataset`. 
 
-The *Meta-dataset* download consists of the pipeline configuration files, preextracted meta-features and the performance matrix. One can directly download this to skip costly meta-dataset acquisition procedure.
+The *Meta-dataset* download consists of the pipeline configuration files, preextracted meta-features and the performance matrix. Also the input files exclusive to ZAP-HPO, namely `cls_names.pkl`, `data_m.csv` can be found here. One can directly download this to skip costly meta-dataset acquisition procedure.
 
 # Installation
 
@@ -29,7 +30,7 @@ For the meta-dataset preparation steps please refer to [ZAP](src/ZAP/README.md).
 
 ## 1. ZAP-AS
 
-In order to execute the experiments below please download and decompress the necessary *meta-dataset* files under './data' folder. Then tto prepare the inner CV folds that is required for tuning the AutoFolio model can be prepared by simply running:
+In order to execute the experiments below please download and decompress the necessary *meta-dataset* files under './data' folder. Then to prepare the inner CV folds that is required for tuning the AutoFolio model can be prepared by simply running:
 
 ```
 python -m src.avalable_datasets
