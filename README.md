@@ -9,7 +9,7 @@ Paper: https://arxiv.org/abs/2206.08476
 Our data can be downloaded under the following links:
 * Datasets (~196G): https://bit.ly/3B1zvl0
 * Models (~700M): https://bit.ly/3BhIAGB
-* Meta-dataset (~2.5M): https://bit.ly/3NnhP8W 
+* Meta-dataset (~2.5M): https://bit.ly/3NnhP8W (rows correspond to performance over datasets and columns over pipelines, see Fig. above)
 
 and should be placed under `.data/datasets`, `.data/models`, `.data/meta_dataset`. 
 
