@@ -11,6 +11,7 @@ import yaml
 # fmt: off
 import os  # isort:skip
 import sys  # isort:skip
+from pathlib import Path
 sys.path.insert(0, os.path.abspath("."))  # This is needed for the run_local_test ingestion
 
 here = os.path.dirname(os.path.abspath(__file__))
@@ -51,13 +52,19 @@ class Model():
               AutoDL_ingestion_program/dataset.py
         """
         if model_config is None:
+            # code is in ./baselines/BASELINE_NAME Data is in ./data/meta_dataset/configs
+            parent = os.path.join(os.getcwd(), os.pardir)
+            datapath = os.path.join(parent, 'data/meta_dataset')
+
+            # are the kakao brain configs also loaded here?
             model_config_name = model_config_name or "default.yaml"
-            with open(os.path.join(here, "configs", model_config_name)) as stream:
+            with open(os.path.join(datapath, "configs", model_config_name)) as stream:
                 model_config = yaml.safe_load(stream)
 
         self.done_training = False
         self.metadata = metadata
         self.domain = infer_domain(metadata)
+
         logger.info("The inferred domain of current dataset is: {}."\
                     .format(self.domain))
         self.domain_metadata = get_domain_metadata(metadata, self.domain)

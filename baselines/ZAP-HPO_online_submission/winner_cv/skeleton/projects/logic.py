@@ -95,7 +95,7 @@ class LogicModel(Model):
 
         test_data = pd.DataFrame(test_data, columns = columns)
 
-        data_path = str(Path(__file__).parents[5]/"data")
+        data_path = str(Path(__file__).parents[5]/"data/meta_dataset")
         sparsity = 0
         use_meta = "True"
         split_type = "cv"
@@ -111,8 +111,8 @@ class LogicModel(Model):
 
         LOGGER.info("The following config path was chosen: {}".format(config_path))
 
-        #config_path = Path(__file__).parents[5] / "data/meta_dataset/configs" / "kakaobrain_optimized_per_icgen_augmentation" / aug / config_name
-        #config_path = config_path.with_suffix(".yaml")
+        config_path = Path(__file__).parents[5] / "data/meta_dataset/configs" / "kakaobrain_optimized_per_icgen_augmentation" / aug / config_name
+        config_path = config_path.with_suffix(".yaml")
 
         try:
             with config_path.open() as in_stream:
