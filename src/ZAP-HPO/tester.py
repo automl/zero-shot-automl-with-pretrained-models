@@ -171,5 +171,5 @@ if __name__=="__main__":
     for recall, ndcg_score in tendcg.items():
         print(f"{recall}: {ndcg_score}")
 
-    # --model_path ../ckpts/bpr/default_config/1
+    # --model_path ../../data/models/ZAP-HPO/bpr-loo/0/1 --loo 0
     # --model_path ../ckpts-cvplusloo/bpr/default_config/0/1 --loo 0

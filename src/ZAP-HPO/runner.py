@@ -375,7 +375,7 @@ if __name__=="__main__":
                         help = "Seed for sampling from the meta-dataset")
     parser.add_argument('--config_seed', type=int, default=0, 
                         help="Seed for sampling a surrogate config")
-    parser.add_argument('--save_path', type=str, default='../ckpts', 
+    parser.add_argument('--save_path', type=str, default='../../data/models/ZAP-HPO', 
                         help="The path of the model/log save directory")
     parser.add_argument('--data_path', type=str, default='../../data/meta_dataset', 
                         help="The path of the metadata directory")
