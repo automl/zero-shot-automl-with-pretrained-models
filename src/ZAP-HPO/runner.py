@@ -253,7 +253,7 @@ class ModelRunner:
             larger_gr_output  = nn.Sigmoid()(y_pred_l - y_pred)
             larger_gr_smaller  = nn.Sigmoid()(y_pred_l - y_pred_s)
 
-            logits = torch.cat([output_gr_smaller,larger_gr_output,larger_gr_smaller], 0) # concatenates end to end
+            logits = torch.cat([output_gr_smaller,larger_gr_output,larger_gr_smaller], 0)
 
             loss = self.calculate_bpr_loss(acc, acc_s, acc_l, r, r_s, r_l, logits)
 

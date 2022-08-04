@@ -161,7 +161,7 @@ if __name__=="__main__":
     predictions = runner.predict()
 
     names = []
-    for i in runner.mtrloader_test.dataset.testing_cls:
+    for i in runner.mtrloader_test.dataset.test_datasets:
         names += [i]*args.num_pipelines
     data = pd.DataFrame(names, columns=["dataset"])
     data["predictions"] = predictions

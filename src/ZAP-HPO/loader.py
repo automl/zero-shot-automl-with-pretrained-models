@@ -36,7 +36,7 @@ class TestDatabase(Dataset):
     with open(os.path.join(data_path,"cls_names.pkl"),"rb") as f:
         self.cls = pickle.load(f)
     
-    testing_cls = [f"{i}-{self.cls[loo]}" for i in range(num_aug)]
+    test_datasets = [f"{i}-{self.cls[loo]}" for i in range(num_aug)]
 
     print(f"Testing on {num_aug} augmentations of {self.cls[loo]}")
 
@@ -45,21 +45,22 @@ class TestDatabase(Dataset):
     attributes = data[predictors].copy()
     for alog in _apply_log:
         attributes[alog] = attributes[alog].apply(lambda x: np.log(x))
-    self.testing_cls = testing_cls
+    self.test_datasets = test_datasets
 
-    X_test = np.array(attributes[data.dataset.isin(testing_cls)])
-    y_test = data[data.dataset.isin(testing_cls)]["accuracy"].ravel()
+    X_test = np.array(attributes[data.dataset.isin(test_datasets)])
+    y_test = data[data.dataset.isin(test_datasets)]["accuracy"].ravel()
     
     if input_scaler:
-        len_bool_cat = len(_bool_hps+_categorical_hps)
+        len_nonorm = len(_bool_hps+_categorical_hps)
         # Scaling is done only for numerical HPs 
-        X_test = np.concatenate([input_scaler.transform(X_test[:,:-len_bool_cat]), X_test[:, X_test.shape[1]-len_bool_cat:]], axis = 1)
+        X_test_transformed = input_scaler.transform(X_test[:,:-len_nonorm])
+        X_test = np.concatenate([X_test_transformed, X_test[:, -len_nonorm:]], axis = 1)
     if output_scaler:
         y_test = output_scaler.transform(y_test.reshape(-1,1)).reshape(-1)
 
     self.x = torch.tensor(X_test.astype(np.float32))
     self.y = torch.tensor(y_test.astype(np.float32))
-    self.ranks = data[data.dataset.isin(testing_cls)]["ranks"].ravel().reshape(-1, num_pipelines)
+    self.ranks = data[data.dataset.isin(test_datasets)]["ranks"].ravel().reshape(-1, num_pipelines)
     self.values = y_test.reshape(-1, num_pipelines)
     
   def __len__(self):
@@ -110,81 +111,77 @@ class TrainDatabase(Dataset):
     
     return (x,s,l), (y, self.y[self.training][smaller_idx], self.y[self.training][larger_idx]), (r,r_s,r_l)
 
-def setup_datasets(trainDB_obj,data_path, cv, use_meta, split_type='cv',loo_no=-1,num_aug=15):
+def setup_datasets(trainDB_obj, split_type='cv'):
     ''' Reads the data from data_m.csv and sets up the X, Y and rank datasets for training and validation.
     '''
     # read data
-    data = pd.read_csv(os.path.join(data_path, "data_m.csv"), header=0)
-    cv_folds = pd.read_csv(os.path.join(data_path, "cv_folds.csv"), header=0, index_col=0)
+    data = pd.read_csv(os.path.join(trainDB_obj.data_path, "data_m.csv"), header=0)
+    cv_folds = pd.read_csv(os.path.join(trainDB_obj.data_path, "cv_folds.csv"), header=0, index_col=0)
 
     if split_type=='loo':
 
-        with open(os.path.join(data_path, "cls_names.pkl"), "rb") as f:
+        with open(os.path.join(trainDB_obj.data_path, "cls_names.pkl"), "rb") as f:
             trainDB_obj.cls = pickle.load(f)
 
         # get training/test split
-        exclude_cls_original = trainDB_obj.cls[loo_no]
-        exclude_cls = []
-        for aug in range(num_aug):
-            exclude_cls.append(f"{aug}-{exclude_cls_original}")
-        valid_cls = np.setdiff1d(list(cv_folds[cv_folds["fold"].isin([cv])].index), exclude_cls).tolist()
-        training_cls = np.setdiff1d(list(cv_folds[~cv_folds["fold"].isin([cv])].index), exclude_cls).tolist()
+        core_dataset_name = trainDB_obj.cls[trainDB_obj.loo]
+        test_datasets = [f"{aug}-{core_dataset_name}" for aug in range(trainDB_obj.num_aug)]
+        valid_datasets = np.setdiff1d(list(cv_folds[cv_folds["fold"].isin([trainDB_obj.cv])].index), test_datasets).tolist()
+        training_datasets = np.setdiff1d(list(cv_folds[~cv_folds["fold"].isin([trainDB_obj.cv])].index), test_datasets).tolist()
     else:
-        valid_cls = list(cv_folds[cv_folds["fold"].isin([cv])].index)
-        training_cls = list(cv_folds[~cv_folds["fold"].isin([cv])].index)
+        valid_datasets = list(cv_folds[cv_folds["fold"].isin([trainDB_obj.cv])].index)
+        training_datasets = list(cv_folds[~cv_folds["fold"].isin([trainDB_obj.cv])].index)
 
     # process input
-    predictors = _list_of_metafeatures + _numerical_hps + _bool_hps + _categorical_hps if use_meta else _numerical_hps + _bool_hps + _categorical_hps
+    predictors = _list_of_metafeatures + _numerical_hps + _bool_hps + _categorical_hps if trainDB_obj.use_meta else _numerical_hps + _bool_hps + _categorical_hps
     attributes = data[predictors].copy()
 
     for alog in _apply_log:
         attributes[alog] = attributes[alog].apply(lambda x: np.log(x))
     trainDB_obj.attributes = attributes
 
-    X_train = np.array(attributes[data.dataset.isin(training_cls)])
-    X_valid = np.array(attributes[data.dataset.isin(valid_cls)])
+    X_train = np.array(attributes[data.dataset.isin(training_datasets)])
+    X_valid = np.array(attributes[data.dataset.isin(valid_datasets)])
 
     # process output
-    y_train = data[data.dataset.isin(training_cls)]["accuracy"].ravel()
-    y_valid = data[data.dataset.isin(valid_cls)]["accuracy"].ravel()
-    rank_train = data[data.dataset.isin(training_cls)]["ranks"].ravel()
-    rank_valid = data[data.dataset.isin(valid_cls)]["ranks"].ravel()
+    y_train = data[data.dataset.isin(training_datasets)]["accuracy"].ravel()
+    y_valid = data[data.dataset.isin(valid_datasets)]["accuracy"].ravel()
+    rank_train = data[data.dataset.isin(training_datasets)]["ranks"].ravel()
+    rank_valid = data[data.dataset.isin(valid_datasets)]["ranks"].ravel()
 
     print("Loaded and processed the meta-dataset!")
 
     return (X_train, X_valid, y_train, y_valid, rank_train, rank_valid)
 
-def setup_sparsity(trainDB_obj,X_train):
+def setup_sparsity(trainDB_obj, X_train, y_train):
     # depending on sparsity value, picks that much % from X_train along axis 0.
     # Default would be whole array size X_train.shape[0] for 0 sparsity
     # Value is then sorted and set
     if trainDB_obj.sparsity > 0:
-        trainDB_obj.dense_idx = trainDB_obj.rng2.choice(X_train.shape[0], int((1 - trainDB_obj.sparsity) * X_train.shape[0]), replace=False)
+        trainDB_obj.dense_idx = trainDB_obj.rng2.choice(trainDB_obj.ndatasets["train"], int((1 - trainDB_obj.sparsity) * trainDB_obj.ndatasets["train"]), replace=False)
         trainDB_obj.dense_idx.sort()
         X_train = X_train[trainDB_obj.dense_idx]
-        return X_train
-    else:
-        trainDB_obj.dense_idx = np.arange(X_train.shape[0])
-        return X_train  # default 0 case does no sorting
+        y_train = y_train[trainDB_obj.dense_idx]
+    
+    return X_train, y_train
 
-def setup_normalisation(trainDB_obj, input_normalization, output_normalization, X_train, X_valid, y_train, y_valid):
-    if input_normalization:
-        len_bool_cat = len(_bool_hps + _categorical_hps)
+def setup_normalization(trainDB_obj, X_train, X_valid, y_train, y_valid):
+    if trainDB_obj.input_normalization:
+        len_nonorm = len(_bool_hps + _categorical_hps)
         trainDB_obj.input_scaler = StandardScaler()
-        trainDB_obj.input_scaler.fit(X_train[:, :-len_bool_cat])
+        trainDB_obj.input_scaler.fit(X_train[:, :-len_nonorm])
 
         # Scaling is done only for numerical HPs
-        X_train = np.concatenate(
-            [trainDB_obj.input_scaler.transform(X_train[:, :-len_bool_cat]), X_train[:, X_train.shape[1] - len_bool_cat:]],
-            axis=1)
-        X_valid = np.concatenate(
-            [trainDB_obj.input_scaler.transform(X_valid[:, :-len_bool_cat]), X_valid[:, X_train.shape[1] - len_bool_cat:]],
-            axis=1)
+        X_train_transformed = trainDB_obj.input_scaler.transform(X_train[:, :-len_nonorm])
+        X_train = np.concatenate([X_train_transformed, X_train[:,-len_nonorm:]], axis=1)
+        
+        X_valid_transformed = trainDB_obj.input_scaler.transform(X_valid[:, :-len_nonorm])
+        X_valid = np.concatenate([X_valid_transformed, X_valid[:,-len_nonorm:]], axis=1)
+
     else:
         trainDB_obj.input_scaler = None
 
-
-    if output_normalization:
+    if trainDB_obj.output_normalization:
         
         trainDB_obj.output_scaler = StandardScaler() 
         trainDB_obj.output_scaler.fit(y_train.reshape(-1, 1))
@@ -197,45 +194,39 @@ def setup_normalisation(trainDB_obj, input_normalization, output_normalization, 
 
     return (X_train, X_valid, y_train, y_valid)
 
-def setup_sparse_y_star(trainDB_obj,num_pipelines):
+def get_y_star(trainDB_obj):
+    y_star_dict = dict()
+    for _set in ["train", "valid"]:
+        y_star = []
+        for i in range(trainDB_obj.ndatasets[_set]):
+            y_star += [max(trainDB_obj.values[_set][i]) * torch.ones(trainDB_obj.num_pipelines)]
+        y_star_dict[_set] = torch.cat(y_star)
+    return y_star_dict
+
+def setup_targets(trainDB_obj, y_train):
     if trainDB_obj.sparsity > 0:
         trainDB_obj.ds_ref = trainDB_obj.ds_ref[trainDB_obj.dense_idx]
 
         values_sparse = []
         y_star_sparse = []
         ranks_sparse = []
-        ranks_flat = []
+        ranks_flat_sparse = []
         for ds in np.unique(trainDB_obj.ds_ref):
-            ds_y = trainDB_obj.y["train"][trainDB_obj.dense_idx][np.where(trainDB_obj.ds_ref == ds)[0]]
+            ds_y = y_train[np.where(trainDB_obj.ds_ref == ds)[0]]
             values_sparse.append(ds_y)
             y_star_sparse += [max(values_sparse[-1]) * torch.ones(len(values_sparse[-1]))]
             order = list(np.sort(np.unique(ds_y))[::-1])
             new_ranks = list(map(lambda x: order.index(x), ds_y))
             ranks_sparse.append(new_ranks)
-            ranks_flat += (np.array(new_ranks) / max(new_ranks)).tolist()
+            ranks_flat_sparse += (np.array(new_ranks) / max(new_ranks)).tolist()
         trainDB_obj.y_star.update({"train": torch.cat(y_star_sparse)})
         trainDB_obj.values.update({"train": values_sparse})
         trainDB_obj.ranks.update({"train": ranks_sparse})
-        trainDB_obj.y.update({"train": trainDB_obj.y["train"][trainDB_obj.dense_idx]})
-        trainDB_obj.ranks_flat.update({"train": ranks_flat})
+        trainDB_obj.ranks_flat.update({"train": ranks_flat_sparse})
 
-        # values, ranks and y stay the same
-        y_star = []
-        for i in range(trainDB_obj.ndatasets["valid"]):
-            y_star += [max(trainDB_obj.values["valid"][i]) * torch.ones(num_pipelines)]
-        trainDB_obj.y_star.update({"valid": torch.cat(y_star)})
-
-    else:
-        for _set in ["train", "valid"]:
-            y_star = []
-            for i in range(trainDB_obj.ndatasets[_set]):
-                y_star += [max(trainDB_obj.values[_set][i]) * torch.ones(num_pipelines)]
-            trainDB_obj.y_star.update({_set: torch.cat(y_star)})
-
-def setup_mode(trainDB_obj, mode, y_train):
-    y_train = y_train if trainDB_obj.sparsity == 0 else y_train[trainDB_obj.dense_idx]
-    if mode == "bpr" or mode == "tml":
-        print(f"Setting up pairwise rankings for the {mode} objective. Might take few minutes!")
+def setup_mode(trainDB_obj, y_train):
+    if trainDB_obj.mode == "bpr" or trainDB_obj.mode == "tml":
+        print(f"Setting up better/worse pipelines for the {trainDB_obj.mode} objective. Might take few minutes!")
         trainDB_obj.larger_set = []
         trainDB_obj.smaller_set = []
         for d, k in enumerate(y_train):
@@ -245,79 +236,94 @@ def setup_mode(trainDB_obj, mode, y_train):
             trainDB_obj.smaller_set.append(ss)
 
 class TrainDatabaseCV(TrainDatabase):
-    def __init__(self, seed, data_path, cv, mode = "bpr", sparsity = 0., use_meta = True, num_pipelines = 525,  input_normalization = True, output_normalization = False):
+    def __init__(self, seed, data_path, cv, mode = "bpr", sparsity = 0., use_meta = True, num_pipelines = 525, input_normalization = True, output_normalization = False):
         super(TrainDatabase, self).__init__()
         self.training = "train"
-        self.output_normalization = output_normalization
-        self.input_normalization = input_normalization
+        self.seed = seed
+        self.data_path = data_path
+        self.cv = cv
         self.mode = mode
         self.sparsity = sparsity
+        self.use_meta = use_meta
+        self.num_pipelines = num_pipelines
+        self.output_normalization = output_normalization
+        self.input_normalization = input_normalization
+
         self.rng = np.random.default_rng(seed)
         self.rng2 = np.random.default_rng(seed)
         self.valid_rng = np.random.default_rng(seed)
-        self.num_pipelines = num_pipelines
 
-        X_train, X_valid, y_train, y_valid, rank_train, rank_valid = setup_datasets(self, data_path, cv, use_meta)
+        X_train, X_valid, y_train, y_valid, rank_train, rank_valid = setup_datasets(self, "cv")
 
-        self.ndatasets = {"train": X_train.shape[0]//num_pipelines, "valid": X_valid.shape[0]//num_pipelines}
+        self.ndatasets  = {"train":X_train.shape[0]//num_pipelines,
+                           "valid":X_valid.shape[0]//num_pipelines}
+        self.values     = {"train":y_train.reshape(-1,num_pipelines),
+                           "valid":y_valid.reshape(-1,num_pipelines)}
+        self.ranks      = {"train":rank_train.reshape(-1,num_pipelines),
+                           "valid":rank_valid.reshape(-1,num_pipelines)}
+        self.ranks_flat = {"train":rank_train/max(rank_train),
+                           "valid":rank_valid/max(rank_valid)}
+        self.y_star     = get_y_star(self)
 
-        X_train = setup_sparsity(self, X_train)
+        self.ds_ref = np.concatenate([num_pipelines*[i] for i in range(self.ndatasets["train"])])
 
-        X_train, X_valid, y_train, y_valid = setup_normalisation(self, input_normalization, output_normalization, X_train, X_valid, y_train, y_valid)
-        
+        X_train, y_train = setup_sparsity(self, X_train, y_train)
+        X_train, X_valid, y_train, y_valid = setup_normalization(self, X_train, X_valid, y_train, y_valid)
+        setup_targets(self, y_train)
+        setup_mode(self, y_train)
+
         self.x = {"train":torch.tensor(X_train.astype(np.float32)),
                   "valid":torch.tensor(X_valid.astype(np.float32))}
         self.y = {"train":torch.tensor(y_train.astype(np.float32)),
                   "valid":torch.tensor(y_valid.astype(np.float32))}
-
-        self.values = {"train":y_train.reshape(-1,num_pipelines),"valid":y_valid.reshape(-1,num_pipelines)}
-        self.ranks = {"train":rank_train.reshape(-1,num_pipelines),"valid":rank_valid.reshape(-1,num_pipelines)}
-        self.ranks_flat = dict()
-        self.ranks_flat["valid"] = rank_valid/max(rank_valid)
-        self.ranks_flat["train"] = rank_train/max(rank_train)
-        self.y_star = {"train":[],"valid": []}
-        self.ds_ref = np.concatenate([num_pipelines*[i] for i in range(self.ndatasets["train"])])
-
-        setup_sparse_y_star(self, num_pipelines)
-        setup_mode(self, mode, y_train) # This takes a lot of time
-
+        
 
 class TrainDatabaseCVPlusLoo(TrainDatabase):
     def __init__(self, seed, data_path, cv, loo, mode = "bpr", sparsity = 0., use_meta = True, num_aug = 15, num_pipelines = 525, input_normalization = True, output_normalization = False):
         super(TrainDatabase, self).__init__()
         self.training = "train"
-        self.output_normalization = output_normalization
-        self.input_normalization = input_normalization
+        self.seed = seed
+        self.data_path = data_path
+        self.cv = cv
+        self.loo = loo
         self.mode = mode
         self.sparsity = sparsity
+        self.use_meta = use_meta
+        self.num_aug = num_aug
+        self.num_pipelines = num_pipelines
+        self.output_normalization = output_normalization
+        self.input_normalization = input_normalization
+        
         self.rng = np.random.default_rng(seed)
         self.rng2 = np.random.default_rng(seed)
         self.valid_rng = np.random.default_rng(seed)
 
-        X_train, X_valid, y_train, y_valid, rank_train, rank_valid = setup_datasets(self,data_path,cv,use_meta,split_type='loo',loo_no=loo,num_aug=num_aug)
+        X_train, X_valid, y_train, y_valid, rank_train, rank_valid = setup_datasets(self, "loo")
 
-        self.ndatasets = {"train": X_train.shape[0]//num_pipelines, "valid": X_valid.shape[0]//num_pipelines}
-        
-        X_train = setup_sparsity(self, X_train)
+        self.ndatasets  = {"train":X_train.shape[0]//num_pipelines,
+                           "valid":X_valid.shape[0]//num_pipelines}
+        self.values     = {"train":y_train.reshape(-1,num_pipelines),
+                           "valid":y_valid.reshape(-1,num_pipelines)}
+        self.ranks      = {"train":rank_train.reshape(-1,num_pipelines),
+                           "valid":rank_valid.reshape(-1,num_pipelines)}
+        self.ranks_flat = {"train":rank_train/max(rank_train),
+                           "valid":rank_valid/max(rank_valid)}
+        self.y_star     = {"train":[],
+                           "valid":[]}
 
-        X_train, X_valid, y_train, y_valid = setup_normalisation(self, input_normalization, output_normalization, X_train,
-                                                                 X_valid, y_train, y_valid)
+        self.ds_ref = np.concatenate([num_pipelines*[i] for i in range(self.ndatasets["train"])])
+
+        X_train, y_train = setup_sparsity(self, X_train, y_train)
+
+        X_train, X_valid, y_train, y_valid = setup_normalization(self, X_train, X_valid, y_train, y_valid)
+
+        setup_targets(self, y_train)
+        setup_mode(self, y_train)
 
         self.x = {"train":torch.tensor(X_train.astype(np.float32)),
                   "valid":torch.tensor(X_valid.astype(np.float32))}
         self.y = {"train":torch.tensor(y_train.astype(np.float32)),
                   "valid":torch.tensor(y_valid.astype(np.float32))}
-
-        self.values = {"train":y_train.reshape(-1,num_pipelines),"valid":y_valid.reshape(-1,num_pipelines)}
-        self.ranks = {"train":rank_train.reshape(-1,num_pipelines),"valid":rank_valid.reshape(-1,num_pipelines)}
-        self.ranks_flat = dict()
-        self.ranks_flat["valid"] = rank_valid/max(rank_valid)
-        self.ranks_flat["train"] = rank_train/max(rank_train)
-        self.y_star = {"train":[],"valid": []}
-        self.ds_ref = np.concatenate([num_pipelines*[i] for i in range(self.ndatasets["train"])])
-
-        setup_sparse_y_star(self, num_pipelines)
-        setup_mode(self, mode, y_train)
 
 def get_tr_loader(seed, data_path, mode = "bpr", split_type="cv", cv = 1, loo = None, sparsity = 0, use_meta=True, num_aug = 15, num_pipelines = 525, batch_size = 64):
 

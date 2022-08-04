@@ -74,10 +74,10 @@ class Log:
         self.logf.flush()
         
 def construct_model_path(save_path, config_identifier, split_type, loo, cv, mode, weighted, weigh_fn, sparsity, use_meta):
-    extra = f"-{sparsity}" if sparsity > 0 else ""
-    extra += "-no-meta" if not use_meta else ""
-    if mode == "regression" or mode == "bpr":
-        extra += f"-function-{weigh_fn}" if weighted else ""
+    extra = f"-sparsity_{sparsity}" if sparsity > 0 else ""
+    extra += "-no_meta" if not use_meta else ""
+    if mode == "bpr":
+        extra += f"-weigh_fn_{weigh_fn}" if weighted else ""
 
     if split_type!="loo":
         model_path = os.path.join(save_path, f"{'weighted-' if weighted else ''}{mode}{extra}", config_identifier, str(cv))
