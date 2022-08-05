@@ -26,7 +26,7 @@ threads = [
     threading.Thread(target=lambda: torch.cuda.synchronize()),
     threading.Thread(target=lambda: tf.Session())
 ]
-[t.start() for t in threads]
+#[t.start() for t in threads]
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 LOGGER = get_logger(__name__)

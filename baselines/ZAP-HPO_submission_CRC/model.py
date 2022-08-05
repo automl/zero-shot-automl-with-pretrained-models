@@ -51,7 +51,7 @@ class Model():
           metadata: an AutoDLMetadata object. Its definition can be found in
               AutoDL_ingestion_program/dataset.py
         """
-        logger.info("model config {} and name {}.".format(model_config, model_config_name))
+
         if model_config is None:
             # code is in ./baselines/BASELINE_NAME Data is in ./data/meta_dataset/configs
             parent = os.path.join(os.getcwd(), os.pardir)
