@@ -55,7 +55,7 @@ class Model():
             parent = os.path.join(os.getcwd(), os.pardir)
             datapath = os.path.join(parent, 'data/meta_dataset')
 
-            # are the kakao brain configs also loaded here?
+            # kakao brain configs also loaded here
             if model_config_name is None:
                 config_path = os.path.join(datapath, "configs", "default.yaml")
             else:
