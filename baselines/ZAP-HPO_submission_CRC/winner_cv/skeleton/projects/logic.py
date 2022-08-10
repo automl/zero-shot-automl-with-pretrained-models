@@ -99,7 +99,7 @@ class LogicModel(Model):
         sparsity = 0
         use_meta = "True"
         split_type = "cv"
-        save_path = Path(__file__).parents[3] / "ckpts"
+        save_path = Path(__file__).parents[5] /"data/ZAP-HPO/ckpts/ZAP-HPO-D100"
         predictions = []
         for cv in [1, 2, 3, 4, 5]:
             runner = ModelTesterOnline(data_path, test_data, 1, cv, "bpr", 333, sparsity, eval(use_meta), save_path, split_type)
