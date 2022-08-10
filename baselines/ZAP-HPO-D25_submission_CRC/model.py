@@ -51,14 +51,25 @@ class Model():
               AutoDL_ingestion_program/dataset.py
         """
         if model_config is None:
-            model_config_name = model_config_name or "default.yaml"
-            with open(os.path.join(here, "configs", model_config_name)) as stream:
-                model_config = yaml.safe_load(stream)
+            # code is in ./baselines/BASELINE_NAME Data is in ./data/meta_dataset/configs
+            parent = os.path.join(os.getcwd(), os.pardir)
+            datapath = os.path.join(parent, 'data/meta_dataset')
+
+            # kakao brain configs also loaded here
+            if model_config_name is None:
+                config_path = os.path.join(datapath, "configs", "default.yaml")
+            else:
+                # Take from kakaobrain folder
+                config_path = os.path.join(datapath, "configs/kakaobrain_optimized_per_icgen_augmentation",
+                                           f"{model_config_name}.yaml")
+
+        with open(config_path) as stream:
+            model_config = yaml.safe_load(stream)
 
         self.done_training = False
         self.metadata = metadata
         self.domain = infer_domain(metadata)
-        logger.info("The inferred domain of current dataset is: {}."\
+        logger.info("The inferred domain of current dataset is: {}." \
                     .format(self.domain))
         self.domain_metadata = get_domain_metadata(metadata, self.domain)
         print(self.domain)
