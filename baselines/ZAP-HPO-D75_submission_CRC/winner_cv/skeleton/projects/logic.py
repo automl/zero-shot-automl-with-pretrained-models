@@ -9,26 +9,24 @@ import skeleton
 import torch
 import yaml
 import random
+import pandas as pd
+from scipy import stats
 
 from .api import Model
 from .others import *
 
 LOGGER = get_logger(__name__)
 
+_insertion = str(Path(__file__).parents[0]/"surrogate")
+print(_insertion)
+sys.path.insert(0, _insertion)
+from tester import ModelTesterOnline
+import config2vector
+
 class LogicModel(Model):
     def __init__(self, metadata, session=None, model_config=None):
         super(LogicModel, self).__init__(metadata)
         # execute installs here
-
-        test_dataset_name = self.metadata.get_dataset_name().split("/")[-3]
-        test_dataset_aug = self.metadata.get_dataset_name().split("/")[-4]
-
-        
-        import json
-        with open(str(Path(__file__).parents[3]/"predictions.json"), "r") as f:
-            config_preds = json.load(f)["0"]
-
-
 
         LOGGER.info('--------- Model.metadata ----------')
         LOGGER.info('path: %s', self.metadata.get_dataset_name())
@@ -60,13 +58,55 @@ class LogicModel(Model):
             'terminate': False
         }
 
-        pred_config_name = config_preds[str(test_dataset_aug)+"-"+test_dataset_name]
-        aug, config_name = pred_config_name.split('-')
+        config_paths, _, _ = config2vector.get_config_response()
+        print(f"Number of configurations: {len(config_paths)}")
+        config_X = config2vector.create_searchspace(config_paths)
 
-        LOGGER.info("The following config was chosen: {}-{}".format(aug, config_name))
+        _list_of_metafeatures = ['num_channels', 'num_classes', 'num_train', 'resolution_0']
+        _categorical_hps = ['simple_model_LR', 'simple_model_NuSVC', 'simple_model_RF',
+                            'simple_model_SVC', 'architecture_ResNet18',
+                            'architecture_efficientnetb0', 'architecture_efficientnetb1',
+                            'architecture_efficientnetb2', 'scheduler_cosine', 'scheduler_plateau']
+        _numerical_hps = ['early_epoch', 'first_simple_model', 'max_inner_loop_ratio', 'min_lr',
+                          'skip_valid_score_threshold', 'test_after_at_least_seconds',
+                          'test_after_at_least_seconds_max', 'test_after_at_least_seconds_step',
+                          'batch_size', 'cv_valid_ratio', 'max_size', 'max_valid_count',
+                          'steps_per_epoch', 'train_info_sample', 'amsgrad', 'freeze_portion',
+                          'lr', 'momentum', 'nesterov', 'warm_up_epoch', 'warmup_multiplier',
+                          'wd']
+        columns = ["dataset"] + _list_of_metafeatures + _numerical_hps + _categorical_hps
 
-        config_path = Path(__file__).parents[5] / "data/meta_dataset/configs" / "kakaobrain_optimized_per_icgen_augmentation" / aug / config_name
-        config_path = config_path.with_suffix(".yaml")
+        # get feature vector containing num_channels, num_classes, num_train, resolution_0
+        train_metadata_filename = self.metadata.get_dataset_name() + '/metadata.textproto'
+        num_train = [int(line.split(':')[1]) for line in open(train_metadata_filename, 'r').readlines()[:3] if
+                     'sample_count' in line][0]
+        LOGGER.info('num_test:  %d', num_train)
+
+        _, resolution_0, _, num_channels = self.metadata.get_tensor_shape()
+        num_classes = self.info['dataset']['num_class']
+        feature = [num_channels, num_classes, num_train, resolution_0]
+
+        test_data = []
+        for v in config_X:
+            test_data.append(["test_online"] + feature + v)
+
+        test_data = pd.DataFrame(test_data, columns=columns)
+
+        data_path = str(Path(__file__).parents[5] / "data/meta_dataset")
+        sparsity = 0
+        use_meta = "True"
+        split_type = "cv"
+        save_path = Path(__file__).parents[5] / "data/ZAP-HPO/ckpts/ZAP-HPO-D50_submission_CRC"
+        predictions = []
+        for cv in [1, 2, 3, 4, 5]:
+            runner = ModelTesterOnline(data_path, test_data, 1, cv, "bpr", 333, sparsity, eval(use_meta), save_path,
+                                       split_type)
+            scores = runner.test()
+            predictions.append(np.argmax(scores))
+        print(predictions)
+
+        config_path = Path(config_paths[stats.mode(predictions)[0][0]])
+        LOGGER.info("The following config path was chosen: {}".format(config_path))
 
         try:
             with config_path.open() as in_stream:

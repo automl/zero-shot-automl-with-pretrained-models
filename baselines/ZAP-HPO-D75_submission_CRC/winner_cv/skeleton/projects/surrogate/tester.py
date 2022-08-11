@@ -154,7 +154,7 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=2)
     parser.add_argument('--data-path', type=str, default='../data', help='the path of save directory')
-    parser.add_argument('--save-path', type=str, default='.data/ZAP-HPO/ckpts/ZAP-HPO_submission_CRC', help='the path of save directory')
+    parser.add_argument('--save-path', type=str, default='.data/ZAP-HPO/ckpts/ZAP-HPO-D75_submission_CRC', help='the path of save directory')
     parser.add_argument('--load-model', type=str, default="True", choices=["True","False"])
     parser.add_argument('--mode', type=str, default='bpr', help='training objective',choices=["regression","bpr"])
     parser.add_argument('--loo', type=int, default=0, help='Index of dataset [0,34] that should be removed')
