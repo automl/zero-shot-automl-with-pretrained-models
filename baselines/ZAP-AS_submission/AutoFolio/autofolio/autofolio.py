@@ -20,8 +20,8 @@ try:
 except ImportError:
     pass
 
-sys.path.insert(0, os.path.abspath("ekrem_non-nn_submission/AutoFolio"))
-sys.path.insert(0, os.path.abspath("ekrem_non-nn_submission/ASlibScenario"))
+sys.path.insert(0, os.path.abspath("ZAP-AS_submission/AutoFolio"))
+sys.path.insert(0, os.path.abspath("ZAP-AS_submission/ASlibScenario"))
 
 from ASlibScenario.aslib_scenario import aslib_scenario  # needed for opening the model file
 from ASlibScenario.aslib_scenario.aslib_scenario import ASlibScenario
