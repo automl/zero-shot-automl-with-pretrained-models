@@ -131,3 +131,6 @@ dmypy.json
 
 # Caches
 ._*
+
+# Models
+**.pth
