@@ -6,19 +6,8 @@ import pandas as pd
 
 sys.path.append(os.getcwd())
 
-_numerical_hps = ['early_epoch', 'max_inner_loop_ratio', 'min_lr',
-                  'skip_valid_score_threshold', 'test_after_at_least_seconds',
-                  'test_after_at_least_seconds_max', 'test_after_at_least_seconds_step',
-                  'batch_size', 'cv_valid_ratio', 'max_size', 'max_valid_count',
-                  'steps_per_epoch', 'train_info_sample', 'freeze_portion',
-                  'lr', 'momentum', 'warm_up_epoch', 'warmup_multiplier',
-                  'wd']
-_bool_hps = ["first_simple_model", "amsgrad", "nesterov"]
-_categorical_hps = ['simple_model_LR', 'simple_model_NuSVC', 'simple_model_RF',
-                    'simple_model_SVC', 'architecture_ResNet18',
-                    'architecture_efficientnetb0', 'architecture_efficientnetb1',
-                    'architecture_efficientnetb2', 'scheduler_cosine', 'scheduler_plateau', 'optimiser_sgd',
-                    'optimiser_adam', 'optimiser_adamw']
+from loader import bool_hps, categorical_hps, numerical_hps
+
 
 N_AUGMENTATIONS = 15
 all_datasets = ['cifar100', 'cycle_gan_vangogh2photo', 'uc_merced', 'cifar10', 'cmaterdb_devanagari',
@@ -31,23 +20,40 @@ all_datasets = ['cifar100', 'cycle_gan_vangogh2photo', 'uc_merced', 'cifar10', '
                 'emnist_balanced', 'cars196', 'cycle_gan_iphone2dslr_flower', 'cycle_gan_summer2winter_yosemite',
                 'cats_vs_dogs']
 
-HP_NAMES = _numerical_hps+_bool_hps+_categorical_hps
+HP_NAMES = numerical_hps+bool_hps+categorical_hps
 
-ENCODE_ARCH = {'ResNet18': [1, 0, 0, 0], 'efficientnetb0': [0, 1, 0, 0], 'efficientnetb1': [0, 0, 1, 0],
+ENCODE_ARCH = {'ResNet18': [1, 0, 0, 0], 
+               'efficientnetb0': [0, 1, 0, 0], 
+               'efficientnetb1': [0, 0, 1, 0],
                'efficientnetb2': [0, 0, 0, 1]}
-ENCODE_OPTIM = {'SGD': [0, 0, 1], 'Adam': [0, 1, 0], 'AdamW': [1, 0, 0]}
-ENCODE_SIMPLE_MODEL = {'SVC': [0, 0, 0, 1], 'NuSVC': [0, 1, 0, 0], 'RF': [0, 0, 1, 0], 'LR': [1, 0, 0, 0]}
-ENCODE_SCHED = {'plateau': [0, 1], 'cosine': [1, 0]}
+
+ENCODE_OPTIM = {'SGD': [0, 0, 1], 
+                'Adam': [0, 1, 0], 
+                'AdamW': [1, 0, 0]}
+
+ENCODE_SIMPLE_MODEL = {'SVC': [0, 0, 0, 1], 
+                       'NuSVC': [0, 1, 0, 0], 
+                       'RF': [0, 0, 1, 0], 
+                       'LR': [1, 0, 0, 0]}
+
+ENCODE_SCHED = {'plateau': [0, 1], 
+                'cosine': [1, 0]}
 
 
 def get_config_response(config_dir=Path(__file__).parents[6] / "data/meta_dataset/configs" / "kakaobrain_optimized_per_icgen_augmentation",
-                        response_dir=Path(__file__).parents[6] / "data/meta_dataset/perf_matrix.csv"):
-    config_paths = [os.path.join(config_dir, str(n), dataset_name) + '.yaml' for dataset_name in all_datasets for n in
+                        response_file=Path(__file__).parents[6] / "data/meta_dataset/perf_matrix.csv"):
+    config_paths = [os.path.join(config_dir, str(aug_n), dataset_name) + '.yaml' for dataset_name in all_datasets for aug_n in
                     range(N_AUGMENTATIONS)]
-    response_ids = [str(n) + '-' + dataset_name for dataset_name in all_datasets for n in range(N_AUGMENTATIONS)]
-    response = pd.read_csv(response_dir, index_col=0)
+    response_ids = [str(aug_n) + '-' + dataset_name for dataset_name in all_datasets for aug_n in range(N_AUGMENTATIONS)]
+    response = pd.read_csv(response_file, index_col=0)
 
     return config_paths, response_ids, response
+
+def get_config_paths(config_dir):
+    config_paths = [os.path.join(config_dir, str(aug_n), dataset_name) + '.yaml' for dataset_name in all_datasets for aug_n in
+                    range(N_AUGMENTATIONS)]
+
+    return config_paths
 
 
 def create_searchspace(path):
@@ -92,18 +98,10 @@ def create_searchspace(path):
     hp_vector.append(int(config['nesterov']) if config['type'] == 'SGD' else 0)
 
     # CATEGORICAL
-    hp_vector += ENCODE_SIMPLE_MODEL[config['simple_model']] if config['first_simple_model'] else [0, 0, 0, 0]  # 4
-    hp_vector += ENCODE_ARCH[config['architecture']]  # 4
-    hp_vector += ENCODE_SCHED[config['scheduler']] # 2
-    hp_vector += ENCODE_OPTIM[config['type']] # 3
+    hp_vector += ENCODE_SIMPLE_MODEL[config['simple_model']] if config['first_simple_model'] else [0, 0, 0, 0]  # D=4
+    hp_vector += ENCODE_ARCH[config['architecture']]  # D=4
+    hp_vector += ENCODE_SCHED[config['scheduler']] # D=2
+    hp_vector += ENCODE_OPTIM[config['type']] # D=3
 
     return dict(zip(HP_NAMES, hp_vector))
 
-    # hpo_X = MinMaxScaler().fit_transform(hpo_X)
-
-    '''hpo_dict = dict() for idx, _id in enumerate(response_ids): hpo_dict[_id] = {'CONFIG': hpo_X[idx], 'RESPONSE': 
-    np.expand_dims(np.array([response.loc[_id2, _id] for _id2 in response_ids]), axis = 1), } // Not using it right 
-    now with open(os.path.join("results/config_vectors.json"), "w") as f: json.dump(hpo_dict, f)
-
-    return hpo_X
-    '''

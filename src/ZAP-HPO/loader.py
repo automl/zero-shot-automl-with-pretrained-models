@@ -8,7 +8,7 @@ import os
 import pickle
 import numpy as np
 import copy
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.preprocessing import StandardScaler
 
 list_of_metafeatures = ['num_channels', 'num_classes', 'num_train', 'resolution_0']
 bool_hps = ["first_simple_model", "amsgrad", "nesterov"]
@@ -36,7 +36,7 @@ def normalize_input(X, input_scaler = None):
     len_nonorm = len(bool_hps+categorical_hps)
     if not input_scaler:
         input_scaler = StandardScaler()
-        input_scaler.fit(X[:, :-len_nonorm])
+        input_scaler.fit(X[:, :-len_nonorm]) # Only fit to numerical HPs
 
     X_transformed = input_scaler.transform(X[:, :-len_nonorm])
     X = np.concatenate([X_transformed, X[:,-len_nonorm:]], axis=1)
@@ -94,17 +94,16 @@ class TestDatabase(Dataset):
         _cls = pickle.load(f)
 
     test_datasets = [f"{i}-{_cls[loo]}" for i in range(num_aug)]
-
+    self.test_datasets = test_datasets
     print(f"Testing on {num_aug} augmentations of {_cls[loo]}")
 
     # Process input
     features  = list_of_metafeatures+numerical_hps+bool_hps+categorical_hps if use_meta else numerical_hps+bool_hps+categorical_hps
-    X_test = data[features].copy()
+    X = data[features].copy()
     for feat in apply_log:
-        X_test[feat] = X_test[feat].apply(lambda x: np.log(x))
-    self.test_datasets = test_datasets
-
-    X_test = np.array(X_test[data.dataset.isin(test_datasets)])
+        X[feat] = X[feat].apply(lambda x: np.log(x))
+    
+    X_test = np.array(X[data.dataset.isin(test_datasets)])
     y_test = data[data.dataset.isin(test_datasets)]["accuracy"].ravel()
 
     if input_scaler:
@@ -125,6 +124,27 @@ class TestDatabase(Dataset):
         y = self.y[index]
         return x, y
 
+class PredictionDatabase(Dataset):
+    def __init__(self, data, input_scaler = None, use_meta = True):
+        
+        features = list_of_metafeatures+numerical_hps+bool_hps+categorical_hps if use_meta else numerical_hps+bool_hps+categorical_hps
+        X_test = data[features].copy()
+        for feat in apply_log:
+            X_test[feat] = X_test[feat].apply(lambda x: np.log(x))
+        X_test = np.array(X_test)
+        
+        if input_scaler:
+            X_test, _ = normalize_input(X_test, input_scaler)
+
+        self.x = torch.tensor(X_test.astype(np.float32))
+
+    def __len__(self):
+        return len(self.x)
+
+    def __getitem__(self, index):
+        x = self.x[index]
+        return x
+
 class TrainDatabase(Dataset):
     
     def __getitem__(self, index):
@@ -134,19 +154,19 @@ class TrainDatabase(Dataset):
             return self.__get_bpr_item__(index)
 
     def __len__(self):
-        return len(self.y[self.training])
+        return len(self.y[self.set])
 
     def __get_regression_item__(self, index):
-        x = self.x[self.training][index]
-        y = self.y[self.training][index] 
-        ystar  = self.y_star[self.training][index]
+        x = self.x[self.set][index]
+        y = self.y[self.set][index] 
+        ystar  = self.y_star[self.set][index]
 
         return x, y, ystar
 
     def __get_bpr_item__(self, index):
-        x = self.x[self.training][index]
-        y = self.y[self.training][index]
-        r = self.ranks_flat[self.training][index]
+        x = self.x[self.set][index]
+        y = self.y[self.set][index]
+        r = self.ranks_flat[self.set][index]
 
         try:
             larger_idx  = self.rng.choice(self.larger_set[index])
@@ -158,12 +178,12 @@ class TrainDatabase(Dataset):
         except ValueError:
             smaller_idx = index
 
-        s = self.x[self.training][smaller_idx]
-        r_s = self.ranks_flat[self.training][smaller_idx]
-        l = self.x[self.training][larger_idx]
-        r_l = self.ranks_flat[self.training][larger_idx]
+        s = self.x[self.set][smaller_idx]
+        r_s = self.ranks_flat[self.set][smaller_idx]
+        l = self.x[self.set][larger_idx]
+        r_l = self.ranks_flat[self.set][larger_idx]
 
-        return (x,s,l), (y, self.y[self.training][smaller_idx], self.y[self.training][larger_idx]), (r,r_s,r_l)
+        return (x,s,l), (y, self.y[self.set][smaller_idx], self.y[self.set][larger_idx]), (r,r_s,r_l)
 
     def initialize(self, split_type):
         self.rng = np.random.default_rng(self.seed)
@@ -173,12 +193,12 @@ class TrainDatabase(Dataset):
 
         self.n_datasets_train  = X_train.shape[0]//self.num_pipelines
         self.n_datasets_val    = X_valid.shape[0]//self.num_pipelines
+        # Reference index for datasets to work with sparse sets
+        self.ds_ref = np.concatenate([self.num_pipelines*[i] for i in range(self.n_datasets_train)]) 
 
         dense_idx = get_dense_index(self.sparsity, X_train.shape[0], self.seed)
         X_train = X_train[dense_idx]
         y_train = y_train[dense_idx]
-
-        self.ds_ref = np.concatenate([self.num_pipelines*[i] for i in range(self.n_datasets_train)])
         self.ds_ref = self.ds_ref[dense_idx]
 
         self.input_scaler = None
@@ -205,7 +225,9 @@ class TrainDatabase(Dataset):
 
 
     def load_n_split_datasets(self, split_type):
-
+        '''
+        Loads the meta-dataset, splits it according to given inner(cv) fold and outer(loo) fold
+        '''
         data = pd.read_csv(os.path.join(self.data_path, "data_m.csv"), header=0)
         cv_folds = pd.read_csv(os.path.join(self.data_path, "cv_folds.csv"), header=0, index_col=0)
 
@@ -214,6 +236,7 @@ class TrainDatabase(Dataset):
             with open(os.path.join(self.data_path, "cls_names.pkl"), "rb") as f:
                 _cls = pickle.load(f)
             core_dataset_name = _cls[self.loo]
+            print(f"Augmentations of {core_dataset_name} has been left out.")
             test_datasets = [f"{aug}-{core_dataset_name}" for aug in range(self.num_aug)]
             valid_datasets = np.setdiff1d(list(cv_folds[cv_folds["fold"].isin([self.cv])].index), test_datasets).tolist()
             training_datasets = np.setdiff1d(list(cv_folds[~cv_folds["fold"].isin([self.cv])].index), test_datasets).tolist()
@@ -244,15 +267,13 @@ class TrainDatabase(Dataset):
         Sets validation targets according to y_valid, rank_valid
         Training targets might be sparse, so we cannot set ranks etc. as easy as validation targets
         '''
-
-        # Create training targets 
         values_tr = []
         ranks_tr = []
         ranks_flat_tr = []
         for dataset_idx in range(self.n_datasets_train):
             dataset_values = y_train[np.where(self.ds_ref == dataset_idx)[0]]
-            new_order = np.flip(dataset_values.argsort())
-            new_ranks = new_order.argsort()
+            new_order = np.flip(dataset_values.argsort()) # Sort ASC, then flip
+            new_ranks = new_order.argsort() # Sparsity changes rankings
             values_tr.append(dataset_values)
             ranks_tr.append(new_ranks)
             ranks_flat_tr.extend(new_ranks/max(new_ranks))
@@ -293,7 +314,7 @@ class TrainDatabase(Dataset):
 class TrainDatabaseCV(TrainDatabase):
     def __init__(self, seed, data_path, cv, mode = "bpr", sparsity = 0., use_meta = True, num_pipelines = 525, input_normalization = True, output_normalization = False):
         super(TrainDatabase, self).__init__()
-        self.training = "train"
+        self.set = "train"
         self.seed = seed
         self.data_path = data_path
         self.cv = cv
@@ -310,7 +331,7 @@ class TrainDatabaseCV(TrainDatabase):
 class TrainDatabaseCVPlusLoo(TrainDatabase):
     def __init__(self, seed, data_path, cv, loo, mode = "bpr", sparsity = 0., use_meta = True, num_aug = 15, num_pipelines = 525, input_normalization = True, output_normalization = False):
         super(TrainDatabase, self).__init__()
-        self.training = "train"
+        self.set = "train"
         self.seed = seed
         self.data_path = data_path
         self.cv = cv
@@ -336,15 +357,21 @@ def get_tr_loader(seed, data_path, mode = "bpr", split_type="cv", cv = 1, loo = 
 
     loader = DataLoader(dataset = dataset, batch_size = batch_size, shuffle = True)
 
+    # Loader for validating the meta-training procedure
     unshuffled_loader = DataLoader(dataset = copy.deepcopy(dataset), batch_size = num_pipelines, shuffle = False)
-    unshuffled_loader.dataset.mode="regression"
+    unshuffled_loader.dataset.mode="regression" # Don't need to sample better/worse samples
 
     print("Data setup done!")
 
     return loader, unshuffled_loader
 
-def get_ts_loader(data_path, loo, input_scaler = None, output_scaler = None, use_meta=True, num_aug = 15, num_pipelines = 525):
+def get_ts_loader(data_path, loo, input_scaler = None, output_scaler = None, use_meta = True, num_aug = 15, num_pipelines = 525):
     dataset = TestDatabase(data_path, loo, input_scaler, output_scaler, use_meta, num_aug, num_pipelines)
     loader = DataLoader(dataset = dataset, batch_size = num_pipelines, shuffle = False)
     return loader    
+
+def get_pred_loader(data, input_scaler = None, use_meta = True):
+    dataset = PredictionDatabase(data, input_scaler, use_meta)
+    loader = DataLoader(dataset = dataset, batch_size = data.shape[0], shuffle = False)
+    return loader   
 

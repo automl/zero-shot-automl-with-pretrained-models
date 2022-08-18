@@ -12,13 +12,16 @@ import pickle
 import numpy as np
 import time
 from tqdm import tqdm
-from utils import Log, get_log, save_model, config_from_yaml, config_to_yaml, construct_model_path
+from utils import Log, save_model, config_from_yaml, config_to_yaml, construct_model_path
 from loader import get_tr_loader, get_ts_loader
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 
 
 class surrogate(nn.Module):
+    '''
+    The surrogate MLP model class
+    '''
     def __init__(self, d_in, output_sizes, nonlinearity="relu", dropout=0.0):
         
         super(surrogate, self).__init__()
@@ -44,11 +47,45 @@ class surrogate(nn.Module):
         return x
 
 def WMSE(input, target, weights):
+    '''
+    The weighted loss fn for the regression
+    '''
     out = (input-target)**2
     out = out * weights
     return out.mean()
 
+def weighted_bpr_loss(logits, accuracies, ranks, weigh_fn = "v1", device = torch.device("cpu")):
+    '''
+    The weighted loss fn for the binary pairwise ranking
+    '''
+    acc, acc_s, acc_l = accuracies
+    r, r_s, r_l = ranks
+
+    if weigh_fn == "v0":
+        weights = torch.cat([torch.exp(-(acc - acc_s).pow(2)),
+                             torch.exp(-(acc_s - acc).pow(2)),
+                             torch.exp(-(acc_l - acc_s).pow(2))], 0)
+    elif weigh_fn == "v1":
+        weights = torch.cat([(acc - acc_s).pow(2),
+                             (acc_l - acc).pow(2),
+                             (acc_l - acc_s).pow(2)], 0)
+    elif weigh_fn == "v0-rank":
+        weights = torch.cat([torch.exp(-((r - r_s)).pow(2)),
+                             torch.exp(-((r_s - r)).pow(2)),
+                             torch.exp(-((r_l - r_s)).pow(2))], 0)
+    elif weigh_fn == "v1-rank":
+        weights = torch.cat([((r - r_s)).pow(2),
+                             ((r_l - r)).pow(2),
+                             ((r_l - r_s)).pow(2)], 0)
+    weights = weights.unsqueeze(-1).to(device)
+
+    return nn.BCELoss(weight=weights)(logits, torch.ones_like(logits).to(device))
+
+
 class ModelRunner:
+    '''
+    The surrogate training/validation class
+    '''
     def __init__(self, args):
 
         torch.manual_seed(args.seed)
@@ -75,7 +112,7 @@ class ModelRunner:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.max_corr_dict = {'rank@1': np.inf, 'epoch': -1, "ndcg@5":-1, "ndcg@10":-1, "ndcg@20":-1}
         
-        # check for args.config_path
+        # Check for args.config_path
         if self.config_path is None:
             cs = self.get_configspace(self.config_seed)
             self.config = cs.sample_configuration()
@@ -84,8 +121,10 @@ class ModelRunner:
             self.config = config_from_yaml(self.config_path)
             self.config_identifier = self.config_path.split("/")[-1].split(".yaml")[0]
 
+        neurons_per_layer = [self.config["num_hidden_units"] for _ in range(self.config["num_hidden_layers"])] # hidden layers
+        neurons_per_layer.append(1) # output layer
         self.model = surrogate(d_in = 39 if self.use_meta else 35, 
-                               output_sizes = self.config["num_hidden_layers"]*[self.config["num_hidden_units"]]+[1], 
+                               output_sizes = neurons_per_layer,
                                dropout = self.config["dropout_rate"])
         self.model.to(self.device)
         
@@ -98,40 +137,46 @@ class ModelRunner:
 
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max = self.max_epoch, eta_min = self.config["min_lr"])
 
-        self.mtrloader, self.mtrloader_unshuffled =  get_tr_loader(seed = self.seed, 
-                                                                   data_path = self.data_path, 
-                                                                   mode = self.mode,
-                                                                   split_type = self.split_type,
-                                                                   cv = self.cv,
-                                                                   loo = self.loo, 
-                                                                   sparsity = self.sparsity,
-                                                                   use_meta = self.use_meta,
-                                                                   num_aug = self.num_aug, 
-                                                                   num_pipelines = self.num_pipelines,
-                                                                   batch_size = self.config['batch_size'])
+        # Get the meta-training dataset. Also contains the validation set
+        self.mtrloader, self.mtrloader_unshuffled =  get_tr_loader(self.seed, 
+                                                                   self.data_path, 
+                                                                   self.mode,
+                                                                   self.split_type,
+                                                                   self.cv,
+                                                                   self.loo, 
+                                                                   self.sparsity,
+                                                                   self.use_meta,
+                                                                   self.num_aug, 
+                                                                   self.num_pipelines,
+                                                                   self.config['batch_size'])
 
 
         self.model_path = construct_model_path(self.save_path, self.config_identifier, self.split_type, self.loo, self.cv, 
                                                self.mode, self.weighted, self.weigh_fn, self.sparsity, self.use_meta)
-        
         os.makedirs(self.model_path, exist_ok=True)
+        self.history_path = os.path.join(self.model_path, "history.pkl")
+
         self.mtrlog = Log(self.args, open(os.path.join(self.model_path, 'meta_train_predictor.log'), 'w'))
         self.mtrlog.print_args(self.config)  
 
+        # Save the meta-dataset scalers for later use on test
         with open(os.path.join(self.model_path, "input_scaler.pkl"), 'wb') as f:
             pickle.dump(self.mtrloader.dataset.input_scaler, f) 
-
         with open(os.path.join(self.model_path, "output_scaler.pkl"), 'wb') as f:
             pickle.dump(self.mtrloader.dataset.output_scaler, f) 
 
+        # Save the surrogate model's config for later initialization on test
         config_to_yaml(os.path.join(self.model_path, "model_config.yaml"), self.config)
     
     def train(self):
+        '''
+        The main training wrapper.
+        '''
         history = {"trndcg": [], "vandcg": []}
         for epoch in range(1, self.max_epoch + 1):
             self.mtrlog.ep_sttime = time.time()
             if self.mode=="regression":
-                loss = self.train_epoch()  
+                loss = self.train_regression_epoch()  
             elif self.mode=="bpr":
                 loss = self.train_bpr_epoch()
             elif self.mode=="tml":
@@ -139,62 +184,55 @@ class ModelRunner:
 
             self.scheduler.step()
 
-            self.mtrlog.print_pred_log(loss, 0, 'train', epoch=epoch)
-
             vacorr, vaccc, vandcg = self.validation("valid")
             trcorr, tracc, trndcg = self.validation("train")
- 
-            if self.max_corr_dict['rank@1'] >= vacorr:
-                patience = 0
 
+            self.mtrlog.print_pred_log(loss, 0, 'train', epoch=epoch)
+            self.mtrlog.print_pred_log(0, vacorr, 'valid', ndcg=vandcg, max_corr_dict=self.max_corr_dict)
+
+            vandcg.update({"acc":vaccc,
+                           "rank":vacorr})                          
+            trndcg.update({"acc":tracc,
+                           "rank":trcorr,
+                           "loss":loss})              
+            
+            # Update the training history
+            history["trndcg"].append(trndcg)
+            history["vandcg"].append(vandcg)  
+            with open(self.history_path, 'wb') as f:
+                pickle.dump(history, f) 
+
+            # Save the best surrogate model
             if self.max_corr_dict['rank@1'] > vacorr:
                 self.max_corr_dict['rank@1'] = vacorr
                 self.max_corr_dict['epoch'] = epoch
                 self.max_corr_dict.update(vandcg)
                 save_model(epoch, self.model, self.model_path, max_corr=True)
 
-
-            self.mtrlog.print_pred_log(0, vacorr, 'valid', ndcg=vandcg, max_corr_dict=self.max_corr_dict)
-            
+            # Save a surrogate model checkpoint in every few epochs
             if epoch % self.save_epoch == 0:
                 save_model(epoch, self.model, self.model_path)
             
-            vandcg.update({"acc":vaccc,
-                           "rank":vacorr})                          
-            trndcg.update({"acc":tracc,
-                           "rank":trcorr,
-                           "loss":loss})              
- 
-            history["trndcg"].append(trndcg)
-            history["vandcg"].append(vandcg)  
-
-            history_path = os.path.join(self.model_path, "history.pkl")      
-
-            with open(history_path, 'wb') as f:
-                pickle.dump(history, f)  
-
         self.mtrlog.save_time_log()
 
-        return history
         
-    def train_epoch(self):
+    def train_regression_epoch(self):
         self.model.train()
         self.model.to(self.device)
-
-        self.mtrloader.dataset.training="train"
+        
         dlen = 0
         trloss = 0
-        pbar = self.mtrloader
-        for x, acc, y_ in pbar:
+        for x, acc, y_ in self.mtrloader:
             x = x.to(self.device)
             y = acc.to(self.device)
             self.optimizer.zero_grad()
             y_pred = self.model.forward(x)
             
             if not self.weighted:
-              loss = nn.MSELoss()(y_pred, y.unsqueeze(-1))
+                loss = nn.MSELoss()(y_pred, y.unsqueeze(-1))
             else:
-              loss = WMSE(y_pred,y.unsqueeze(-1),weights=torch.exp(-(acc-y_).pow(2)).unsqueeze(-1))
+                weights = torch.exp(-(acc-y_).pow(2)).unsqueeze(-1).to(self.device)
+                loss = WMSE(y_pred, y.unsqueeze(-1), weights)
 
             loss.backward()
             self.optimizer.step()
@@ -206,28 +244,6 @@ class ModelRunner:
     
         return trloss/dlen
 
-    def calculate_bpr_loss(self, acc, acc_s, acc_l, r, r_s, r_l,logits):
-        if self.weighted:
-            if self.weigh_fn == "v0":
-                weights = torch.cat([torch.exp(-(acc - acc_s).pow(2)),
-                                     torch.exp(-(acc_s - acc).pow(2)),
-                                     torch.exp(-(acc_l - acc_s).pow(2))], 0)
-            elif self.weigh_fn == "v1":
-                weights = torch.cat([(acc - acc_s).pow(2),
-                                     (acc_l - acc).pow(2),
-                                     (acc_l - acc_s).pow(2)], 0)
-            elif self.weigh_fn == "v0-rank":
-                weights = torch.cat([torch.exp(-((r - r_s)).pow(2)),
-                                     torch.exp(-((r_l - r)).pow(2)),
-                                     torch.exp(-((r_l - r_s)).pow(2))], 0)
-            elif self.weigh_fn == "v1-rank":
-                weights = torch.cat([((r - r_s)).pow(2),
-                                     ((r_l - r)).pow(2),
-                                     ((r_l - r_s)).pow(2)], 0)
-
-            return nn.BCELoss(weight=weights.unsqueeze(-1))(logits, torch.ones_like(logits))
-        else:
-            return nn.BCELoss()(logits, torch.ones_like(logits).to(self.device))
 
     def train_bpr_epoch(self):
         self.model.train()
@@ -235,9 +251,7 @@ class ModelRunner:
 
         dlen = 0
         trloss = 0
-        pbar = self.mtrloader
-
-        for (x, s, l), (acc, acc_s, acc_l), (r, r_s, r_l) in pbar:
+        for (x, s, l), accuracies, ranks in self.mtrloader:
             
             x = x.to(self.device)
             s = s.to(self.device)
@@ -245,6 +259,7 @@ class ModelRunner:
 
             self.optimizer.zero_grad()
 
+            # Perf predictions for target, inferior, superior configurations.
             y_pred = self.model.forward(x)
             y_pred_s = self.model.forward(s)
             y_pred_l = self.model.forward(l) 
@@ -255,7 +270,11 @@ class ModelRunner:
 
             logits = torch.cat([output_gr_smaller,larger_gr_output,larger_gr_smaller], 0)
 
-            loss = self.calculate_bpr_loss(acc, acc_s, acc_l, r, r_s, r_l, logits)
+            # Targets are all 1 implying target>smaller, larger>target, larger>smaller
+            if not self.weighted:
+                loss = nn.BCELoss()(logits, torch.ones_like(logits).to(self.device))
+            else:
+                loss = weighted_bpr_loss(logits, accuracies, ranks, self.weigh_fn, self.device)
 
             loss.backward()
             self.optimizer.step()
@@ -271,9 +290,8 @@ class ModelRunner:
 
         dlen = 0
         trloss = 0
-        pbar = self.mtrloader
 
-        for (x, s, l), (acc,acc_s,acc_l), (r,r_s,r_l) in pbar:
+        for (x, s, l), _, _ in self.mtrloader:
 
             x = x.to(self.device)
             s = s.to(self.device)
@@ -281,8 +299,7 @@ class ModelRunner:
             
             self.optimizer.zero_grad()
 
-            # perf predictions for target, inferior, superior configurations
-            # range [0, 1]
+            # Perf predictions for target, inferior, superior configurations. Range [0, 1]
             y_pred = self.model.forward(x) 
             y_pred_s = self.model.forward(s)
             y_pred_l = self.model.forward(l) 
@@ -297,12 +314,11 @@ class ModelRunner:
 
         return trloss/dlen    
 
-    def validation(self, training):
+    def validation(self, _set):
         self.model.eval()
         self.model.to(self.device)
+        self.mtrloader_unshuffled.dataset.set=_set 
 
-        self.mtrloader_unshuffled.dataset.training=training
-        pbar = self.mtrloader_unshuffled
         scores_5 = []
         scores_10 = []
         scores_20 = []
@@ -311,32 +327,38 @@ class ModelRunner:
         predicted_y =[] 
         actual_y = []
         with torch.no_grad():
-          for i,(x,acc,y_) in enumerate(pbar):
-            x = x.to(self.device)
-            y = acc.to(self.device).tolist()
-            y_pred = self.model.forward(x).squeeze().tolist()
+            for i,(x,acc,y_) in enumerate(self.mtrloader_unshuffled):
+                x = x.to(self.device)
+                y = acc.to(self.device).tolist()
+                y_pred = self.model.forward(x).squeeze().tolist()
+
+                actual_y += y
+                predicted_y += y_pred
+
+                if _set!="train": # batch_size is fixed
+                    y_true = np.array(y).reshape(1,-1)
+                    y_score = np.maximum(1e-7,np.array(y_pred)).reshape(1,-1)
+                    scores_5.append(ndcg_score(y_true=y_true, y_score=y_score, k=5))
+                    scores_10.append(ndcg_score(y_true=y_true, y_score=y_score, k=10))
+                    scores_20.append(ndcg_score(y_true=y_true, y_score=y_score, k=20))
+                    ranks.append(self.mtrloader_unshuffled.dataset.ranks[_set][i][np.argmax(y_pred)])
+                    values.append(self.mtrloader_unshuffled.dataset.values[_set][i][np.argmax(y_pred)])         
             
-            actual_y += y
-            predicted_y += y_pred
-            if training!="train": # batch_isez is fixed
-                scores_5.append(ndcg_score(y_true=np.array(y).reshape(1,-1),y_score=np.maximum(1e-7,np.array(y_pred)).reshape(1,-1),k=5))
-                scores_10.append(ndcg_score(y_true=np.array(y).reshape(1,-1),y_score=np.maximum(1e-7,np.array(y_pred)).reshape(1,-1),k=10))
-                scores_20.append(ndcg_score(y_true=np.array(y).reshape(1,-1),y_score=np.maximum(1e-7,np.array(y_pred)).reshape(1,-1),k=20))
-                ranks.append(self.mtrloader_unshuffled.dataset.ranks[training][i][np.argmax(y_pred)])
-                values.append(self.mtrloader_unshuffled.dataset.values[training][i][np.argmax(y_pred)])            
-        if training=="train":
-            start = 0
-            for i,ds in enumerate(np.unique(self.mtrloader_unshuffled.dataset.ds_ref)):
-                end = start + len(np.where(self.mtrloader_unshuffled.dataset.ds_ref==ds)[0])
-                y_true = np.array(actual_y[start:end]).reshape(1,-1)
-                y_score=np.maximum(1e-7,np.array(predicted_y[start:end])).reshape(1,-1)
-                y_pred = predicted_y[start:end]
-                scores_5.append(ndcg_score(y_true=y_true,y_score=y_score,k=5))
-                scores_10.append(ndcg_score(y_true=y_true,y_score=y_score,k=10))
-                scores_20.append(ndcg_score(y_true=y_true,y_score=y_score,k=20))
-                ranks.append(self.mtrloader_unshuffled.dataset.ranks[training][i][np.argmax(y_pred)])
-                values.append(self.mtrloader_unshuffled.dataset.values[training][i][np.argmax(y_pred)])
-                start = end
+            # Need to perform this with another loop due to possible sparsity
+            if _set=="train":
+                start = 0
+                for i,ds in enumerate(np.unique(self.mtrloader_unshuffled.dataset.ds_ref)):
+                    end = start + len(np.where(self.mtrloader_unshuffled.dataset.ds_ref==ds)[0])
+                    y_true = np.array(actual_y[start:end]).reshape(1,-1)
+                    y_score=np.maximum(1e-7,np.array(predicted_y[start:end])).reshape(1,-1)
+                    y_pred = predicted_y[start:end]
+                    scores_5.append(ndcg_score(y_true=y_true,y_score=y_score,k=5))
+                    scores_10.append(ndcg_score(y_true=y_true,y_score=y_score,k=10))
+                    scores_20.append(ndcg_score(y_true=y_true,y_score=y_score,k=20))
+                    ranks.append(self.mtrloader_unshuffled.dataset.ranks[_set][i][np.argmax(y_pred)])
+                    values.append(self.mtrloader_unshuffled.dataset.values[_set][i][np.argmax(y_pred)])
+                    start = end
+                
 
         return np.mean(ranks),np.mean(values), {"NDCG@5":np.mean(scores_5),"NDCG@10":np.mean(scores_10),"NDCG@20":np.mean(scores_20)}
 
@@ -411,9 +433,5 @@ if __name__=="__main__":
     args.use_meta = eval(args.use_meta)
 
     runner = ModelRunner(args)
-    history = runner.train()
-
-    history_path = os.path.join(runner.model_path, "history.pkl")      
-    with open(history_path, 'wb') as f:
-        pickle.dump(history, f)
+    runner.train()
 
