@@ -92,15 +92,12 @@ class LogicModel(Model):
         test_data = pd.DataFrame(test_data, columns = columns)
         
         test_dataset_name = self.metadata.get_dataset_name().split("/")[-3]
-        with open(os.path.join(metadata_path, "cls_names.pkl"),"rb") as f:
-            self.cls = pickle.load(f)
-        loo = np.where(self.cls == test_dataset_name)[0][0]
-        print(f"Test dataset name: {test_dataset_name} | Corresponding LOO index: {loo}")
+        print(f"Test dataset name: {test_dataset_name}") # in other words LOO
         
         
         predictions = []
         for cv in [1, 2, 3, 4, 5]:
-            model_path = Path(__file__).parents[5] /"data/models/ZAP-HPO-loo/bpr/default_config/"/str(loo)/str(cv)
+            model_path = Path(__file__).parents[5] /"data/models/ZAP-HPO-loo/bpr/default_config/"/test_dataset_name/str(cv)
             runner = ModelPredictor(model_path, test_data, use_meta = True)
             cv_predictions = runner.predict()
             predictions.append(np.argmax(cv_predictions))

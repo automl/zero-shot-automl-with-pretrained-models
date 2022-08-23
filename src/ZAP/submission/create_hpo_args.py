@@ -2,8 +2,9 @@ from pathlib import Path
 import os
 import sys
 sys.path.append(os.getcwd())
+sys.path.append("../")
 
-from src.available_datasets import all_datasets
+from available_datasets import all_datasets
 
 def generate_all_commands(args_savepath, n_augmentations):
     '''

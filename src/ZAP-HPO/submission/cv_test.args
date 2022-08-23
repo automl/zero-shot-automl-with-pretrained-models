@@ -1,0 +1,12 @@
+--split_type cv --mode bpr --weighted False --weigh_fn v0 --use_meta True --sparsity 0.0 --cv 1
+--split_type cv --mode bpr --weighted False --weigh_fn v0 --use_meta False --sparsity 0.0 --cv 1
+--split_type cv --mode bpr --weighted False --weigh_fn v0 --use_meta True --sparsity 0.75 --cv 1
+--split_type cv --mode bpr --weighted False --weigh_fn v0 --use_meta True --sparsity 0.5 --cv 1
+--split_type cv --mode bpr --weighted False --weigh_fn v0 --use_meta True --sparsity 0.25 --cv 1
+--split_type cv --mode bpr --weighted True --weigh_fn v0 --use_meta True --sparsity 0.0 --cv 1
+--split_type cv --mode bpr --weighted True --weigh_fn v1 --use_meta True --sparsity 0.0 --cv 1
+--split_type cv --mode regression --weighted False --weigh_fn v0 --use_meta True --sparsity 0.0 --cv 1
+--split_type cv --mode regression --weighted False --weigh_fn v0 --use_meta False --sparsity 0.0 --cv 1
+--split_type cv --mode regression --weighted True --weigh_fn v0 --use_meta True --sparsity 0.0 --cv 1
+--split_type cv --mode tml --weighted False --weigh_fn v0 --use_meta True --sparsity 0.0 --cv 1
+--split_type cv --mode tml --weighted False --weigh_fn v0 --use_meta False --sparsity 0.0 --cv 1

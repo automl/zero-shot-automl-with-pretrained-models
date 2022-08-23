@@ -1,9 +1,11 @@
 import os
+import sys
 import pandas as pd
 
-from available_datasets import GROUPS
+sys.path.append("../")
 
-all_datasets = GROUPS['all']
+from available_datasets import all_datasets
+
 n_augmentations = 15
 
 def split_perf_mat(meta_dataset_main_path):
@@ -66,7 +68,7 @@ if __name__ == "__main__":
 
 
     meta_dataset_main_path = "../../data/meta_dataset"
-    args_savepath = "submission/AutoFolio_args/ZAP-AS.args"
+    args_savepath = "submission/ZAP-AS.args"
     exp_suffix = "ZAP"
     split_perf_mat(meta_dataset_main_path)
     split_meta_features(meta_dataset_main_path)

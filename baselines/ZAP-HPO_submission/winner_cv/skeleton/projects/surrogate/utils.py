@@ -82,7 +82,7 @@ def construct_model_path(save_path, config_identifier, split_type, loo, cv, mode
     if split_type!="loo":
         model_path = os.path.join(save_path, f"{'weighted-' if weighted else ''}{mode}{extra}", config_identifier, str(cv))
     else:
-        model_path = os.path.join(save_path+"-loo", f"{'weighted-' if weighted else ''}{mode}{extra}", config_identifier, str(loo), str(cv))
+        model_path = os.path.join(save_path+"-loo", f"{'weighted-' if weighted else ''}{mode}{extra}", config_identifier, loo, str(cv))
     
     return model_path
 

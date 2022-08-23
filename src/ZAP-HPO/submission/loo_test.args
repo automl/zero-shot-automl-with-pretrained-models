@@ -1,0 +1,12 @@
+--split_type loo --mode bpr --weighted False --weigh_fn v0 --use_meta True --sparsity 0.0 --loo cifar10 --cv 1
+--split_type loo --mode bpr --weighted False --weigh_fn v0 --use_meta False --sparsity 0.0 --loo cifar10 --cv 1
+--split_type loo --mode bpr --weighted False --weigh_fn v0 --use_meta True --sparsity 0.75 --loo cifar10 --cv 1
+--split_type loo --mode bpr --weighted False --weigh_fn v0 --use_meta True --sparsity 0.5 --loo cifar10 --cv 1
+--split_type loo --mode bpr --weighted False --weigh_fn v0 --use_meta True --sparsity 0.25 --loo cifar10 --cv 1
+--split_type loo --mode bpr --weighted True --weigh_fn v0 --use_meta True --sparsity 0.0 --loo cifar10 --cv 1
+--split_type loo --mode bpr --weighted True --weigh_fn v1 --use_meta True --sparsity 0.0 --loo cifar10 --cv 1
+--split_type loo --mode regression --weighted False --weigh_fn v0 --use_meta True --sparsity 0.0 --loo cifar10 --cv 1
+--split_type loo --mode regression --weighted False --weigh_fn v0 --use_meta False --sparsity 0.0 --loo cifar10 --cv 1
+--split_type loo --mode regression --weighted True --weigh_fn v0 --use_meta True --sparsity 0.0 --loo cifar10 --cv 1
+--split_type loo --mode tml --weighted False --weigh_fn v0 --use_meta True --sparsity 0.0 --loo cifar10 --cv 1
+--split_type loo --mode tml --weighted False --weigh_fn v0 --use_meta False --sparsity 0.0 --loo cifar10 --cv 1

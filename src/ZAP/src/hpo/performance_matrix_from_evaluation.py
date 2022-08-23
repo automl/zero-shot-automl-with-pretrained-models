@@ -1,11 +1,13 @@
 import os
 import sys
 sys.path.append(os.getcwd())
+sys.path.append("../")
+
 from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from src.available_datasets import all_datasets
+from available_datasets import all_datasets
 
 def get_scores_dataset_x_configs(dataset_eval_dir, n_augmentations, metric = "alc"):
     config_names = []

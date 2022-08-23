@@ -136,7 +136,7 @@ if __name__=="__main__":
                         help="The full path of the model parent directory.")
     parser.add_argument('--data_path', type=str, default='../../data/meta_dataset', 
                         help="The path of the metadata directory")
-    parser.add_argument('--loo', type=int, default=0, 
+    parser.add_argument('--loo', type=str, default="cifar10", 
                         help="Index of the core dataset [0,34] that was removed and should be tested here.")
     parser.add_argument('--use_meta', type=str, default="True", choices=["True","False"],
                         help="Whether to use the dataset meta-features.")    

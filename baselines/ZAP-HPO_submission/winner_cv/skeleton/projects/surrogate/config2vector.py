@@ -5,20 +5,13 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.append(os.getcwd())
+sys.path.append("../")
 
+from available_datasets import all_datasets
 from loader import bool_hps, categorical_hps, numerical_hps
 
 
 N_AUGMENTATIONS = 15
-all_datasets = ['cifar100', 'cycle_gan_vangogh2photo', 'uc_merced', 'cifar10', 'cmaterdb_devanagari',
-                'cmaterdb_bangla', 'mnist', 'horses_or_humans', 'kmnist', 'cycle_gan_horse2zebra', 'cycle_gan_facades',
-                'cycle_gan_apple2orange', 'imagenet_resized_32x32', 'cycle_gan_maps', 'omniglot', 'imagenette',
-                'emnist_byclass',
-                'svhn_cropped', 'colorectal_histology', 'coil100', 'stanford_dogs', 'rock_paper_scissors', 'tf_flowers',
-                'cycle_gan_ukiyoe2photo', 'cassava', 'fashion_mnist', 'emnist_mnist', 'cmaterdb_telugu', 'malaria',
-                'eurosat_rgb',
-                'emnist_balanced', 'cars196', 'cycle_gan_iphone2dslr_flower', 'cycle_gan_summer2winter_yosemite',
-                'cats_vs_dogs']
 
 HP_NAMES = numerical_hps+bool_hps+categorical_hps
 
@@ -40,8 +33,7 @@ ENCODE_SCHED = {'plateau': [0, 1],
                 'cosine': [1, 0]}
 
 
-def get_config_response(config_dir=Path(__file__).parents[6] / "data/meta_dataset/configs" / "kakaobrain_optimized_per_icgen_augmentation",
-                        response_file=Path(__file__).parents[6] / "data/meta_dataset/perf_matrix.csv"):
+def get_config_response(config_dir, response_file):
     config_paths = [os.path.join(config_dir, str(aug_n), dataset_name) + '.yaml' for dataset_name in all_datasets for aug_n in
                     range(N_AUGMENTATIONS)]
     response_ids = [str(aug_n) + '-' + dataset_name for dataset_name in all_datasets for aug_n in range(N_AUGMENTATIONS)]

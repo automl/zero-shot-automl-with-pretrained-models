@@ -401,7 +401,7 @@ if __name__=="__main__":
                         help="The path of the model/log save directory")
     parser.add_argument('--data_path', type=str, default='../../data/meta_dataset', 
                         help="The path of the metadata directory")
-    parser.add_argument('--config_path',type=str, default = "default_config.yaml",
+    parser.add_argument('--config_path',type=str, default = None,
                         help='Path to config stored in yaml file. No value implies the CS will be sampled.')
     parser.add_argument('--save_epoch', type=int, default=20, 
                         help="How many epochs to wait each time to save model states") 
@@ -415,9 +415,9 @@ if __name__=="__main__":
                         help="BPR objective weighing fn. Only used when '--weighted' is 'True'.")
     parser.add_argument('--split_type', type=str, default="cv", 
                         help="When loo, this omits the designated core-dataset augmentations from the training procedure. Choices: cv|loo")
-    parser.add_argument('--loo', type=int, default=0, 
-                        help="Index of the core dataset [0,34] that should be removed")
-    parser.add_argument('--cv', type=int, default=1, 
+    parser.add_argument('--loo', type=str, default="cifar10", 
+                        help="Name of the core dataset that should be removed")
+    parser.add_argument('--cv', type=int,
                         help="Index of CV [1,5]. Remark that this is the inner split. If LOO, respective core dataset augmentations will be removed from its CV fold.")
     parser.add_argument('--sparsity', type=float, default=0.0,
                         help="Proportion [0.0,1.0) of the missing values in the meta-dataset.")

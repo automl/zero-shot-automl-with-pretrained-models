@@ -90,12 +90,9 @@ class TestDatabase(Dataset):
     # read data
     data = pd.read_csv(os.path.join(data_path, "data_m.csv"), header=0)
 
-    with open(os.path.join(data_path,"cls_names.pkl"),"rb") as f:
-        _cls = pickle.load(f)
-
-    test_datasets = [f"{i}-{_cls[loo]}" for i in range(num_aug)]
+    test_datasets = [f"{i}-{loo}" for i in range(num_aug)]
     self.test_datasets = test_datasets
-    print(f"Testing on {num_aug} augmentations of {_cls[loo]}")
+    print(f"Testing on {num_aug} augmentations of {loo}")
 
     # Process input
     features  = list_of_metafeatures+numerical_hps+bool_hps+categorical_hps if use_meta else numerical_hps+bool_hps+categorical_hps
@@ -229,15 +226,12 @@ class TrainDatabase(Dataset):
         Loads the meta-dataset, splits it according to given inner(cv) fold and outer(loo) fold
         '''
         data = pd.read_csv(os.path.join(self.data_path, "data_m.csv"), header=0)
-        cv_folds = pd.read_csv(os.path.join(self.data_path, "cv_folds.csv"), header=0, index_col=0)
+        cv_folds = pd.read_csv(os.path.join(self.data_path, "inner_CV_folds.csv"), header=0, index_col=0)
 
         # Get training/validation/test split IDs
         if split_type=='loo':
-            with open(os.path.join(self.data_path, "cls_names.pkl"), "rb") as f:
-                _cls = pickle.load(f)
-            core_dataset_name = _cls[self.loo]
-            print(f"Augmentations of {core_dataset_name} has been left out.")
-            test_datasets = [f"{aug}-{core_dataset_name}" for aug in range(self.num_aug)]
+            print(f"Augmentations of {self.loo} has been left out.")
+            test_datasets = [f"{aug}-{self.loo}" for aug in range(self.num_aug)]
             valid_datasets = np.setdiff1d(list(cv_folds[cv_folds["fold"].isin([self.cv])].index), test_datasets).tolist()
             training_datasets = np.setdiff1d(list(cv_folds[~cv_folds["fold"].isin([self.cv])].index), test_datasets).tolist()
         else:
