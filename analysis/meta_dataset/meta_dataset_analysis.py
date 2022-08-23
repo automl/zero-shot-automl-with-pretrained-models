@@ -1,4 +1,6 @@
 import os
+import sys
+sys.path.append(os.getcwd())
 import yaml
 import pandas as pd
 
@@ -121,9 +123,9 @@ def simple_meta_feat_scatterplot(meta_features_path, autodl_meta_features = None
 
 if __name__ == "__main__":
     
-    perf_matrix_path = "../data/meta_dataset/perf_matrix.csv"
-    perf_mat_folds_path = "../data/meta_dataset/perf_matrix_per_outer_CV_fold"
-    configs_path = "../data/configs/kakaobrain_optimized_per_icgen_augmentation"
+    perf_matrix_path = "./data/meta_dataset/perf_matrix.csv"
+    perf_mat_folds_path = "./data/meta_dataset/perf_matrix_per_outer_CV_fold"
+    configs_path = "./data/configs/kakaobrain_optimized_per_icgen_augmentation"
 
     # Plot the performance matrix heatmap and save
     perf_matrix_heatmap(perf_matrix_path)
@@ -135,19 +137,22 @@ if __name__ == "__main__":
     # Get the mean alc score for each dataset
     per_dataset_alc_dict = get_datasetwise_alc(perf_matrix_path)
 
-    meta_features_path = "../data/meta_dataset/meta_features.csv"
+    meta_features_path = "./data/meta_dataset/meta_features.csv"
     
     # Hardcoded meta-features of AutoDL benchmark datasets divided according to challenge phases
+    # Public
     autodl_public_datasets = ["Munster", "Chucky", "Pedro", "Decal", "Hammer", "City"]
     public_num_classes = [10, 100, 26, 11, 7, 10]
     public_num_train = [60000, 48061, 80095, 634, 8050, 48060]
     public_res = [28, 32, -1, -1, 400, 32]
 
+    # Feedback
     autodl_feedback_datasets = ["Ukulele", "Caucase", "Beatriz", "Saturn", "Hippocrate","Apollon", "Freddy"]
     feedback_num_classes = [3, 257, 15, 3, 2, 100, 2]
     feedback_num_train = [6979, 24518, 4406,324000, 175917,6077,546055]
     feedback_res = [-1, -1, 350, 28, 96,-1,-1]
-
+ 
+    # Final/unseen
     autodl_final_datasets = ["Loukoum", "Tim",  "Ideal", "Ray", "Cucumber"]
     final_num_classes = [ 3, 200, 45, 7, 100]
     final_num_train = [ 27938, 80000,  25231, 4492, 18366]
