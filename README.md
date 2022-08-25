@@ -8,8 +8,8 @@ Paper: https://arxiv.org/abs/2206.08476
 # Download Models and Meta-Dataset
 Our data can be downloaded under the following links:
 * Datasets (~196G): https://bit.ly/3B1zvl0
-* Models (~700M): https://bit.ly/3BhIAGB
-* Meta-dataset (~2.5M): https://bit.ly/3NnhP8W 
+* Models (~1.8G): https://bit.ly/3BhIAGB
+* Meta-dataset (~28M): https://bit.ly/3NnhP8W 
 
 Create a data folder `mkdir data`.
 Extract and place the folders as `.data/datasets`, `.data/models`, `.data/meta_dataset`. 
