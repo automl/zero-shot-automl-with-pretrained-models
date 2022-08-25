@@ -177,16 +177,17 @@ python analysis/meta_dataset/meta_dataset_analysis.py
 This will provide these two plots under the `analysis/meta_dataset/`.
 
 # Folder Structure
-
-.
-├── analysis
-├── baselines        
-├── data             
-│   ├── datasets    
-│   ├── meta-dataset  
-│   └── models
-├── src            
-│   ├── ZAP
-│   ├── ZAP-AS
-│   └── ZAP-HPO
-└── ...
+```
+  .
+  ├── analysis          # scripts to visualize the meta-dataset, collect and visualize the benchmarking runs
+  ├── baselines         # self-sufficient solutions and scripts to run solutions (locally/on cluster) on datasets
+  ├── data             
+  │   ├── datasets      # image datasets in AutoDL format
+  │   ├── meta-dataset  # cost matrix, meta features, DL pipeline configs
+  │   └── models        # trained ZAP-AS and ZAP-HPO models 
+  ├── src            
+  │   ├── ZAP           # meta-dataset creation (sampling pipelines, creating cost matrix, meta-feature extraction)
+  │   ├── ZAP-AS        # algorithm selection
+  │   └── ZAP-HPO       # zero-shot HPO
+  └── ...
+```
