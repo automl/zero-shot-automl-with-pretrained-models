@@ -175,3 +175,18 @@ python analysis/meta_dataset/meta_dataset_analysis.py
 ```
 
 This will provide these two plots under the `analysis/meta_dataset/`.
+
+# Folder Structure
+
+.
+├── analysis
+├── baselines        
+├── data             
+│   ├── datasets    
+│   ├── meta-dataset  
+│   └── models
+├── src            
+│   ├── ZAP
+│   ├── ZAP-AS
+│   └── ZAP-HPO
+└── ...
