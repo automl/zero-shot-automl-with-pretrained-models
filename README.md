@@ -9,12 +9,16 @@ Paper: https://arxiv.org/abs/2206.08476
 Our data can be downloaded under the following links:
 * Datasets (~196G): https://bit.ly/3B1zvl0
 * Models (~1.8G): https://bit.ly/3BhIAGB
-* Meta-dataset (~28M): https://bit.ly/3NnhP8W 
+* Meta-dataset (~30M): https://bit.ly/3NnhP8W 
 
 Create a data folder `mkdir data`.
 Extract and place the folders as `.data/datasets`, `.data/models`, `.data/meta_dataset`. 
 
-The *Meta-dataset* download consists of the pipeline configuration files, preextracted meta-features and the performance matrix. Also the input files exclusive to ZAP-HPO, namely `cls_names.pkl`, `data_m.csv` can be found here. One can directly download this to skip costly meta-dataset acquisition procedure.
+The *Meta-dataset* download consists of the pipeline configuration files, preextracted meta-features and the performance(cost) matrix (also the performance matrix of final accuracies can be found here). The input files exclusive to ZAP-HPO, namely `cls_names.pkl`, `data_m.csv` can be found here. One can directly download this to skip costly meta-dataset acquisition procedure.
+
+Alternatively one can find a single dataset (cifar10) augmentation under the link below in order to check the format, test the setup etc.
+
+* 0/cifar10 (35M): ...
 
 # Installation
 
