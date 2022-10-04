@@ -1,0 +1,1 @@
+command: python $ingestion_program/ingestion.py --dataset_dir=/tmp/codalab/dev_input --output_dir=$output --ingestion_program_dir=$ingestion_program --code_dir=$submission_program

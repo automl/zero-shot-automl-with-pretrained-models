@@ -1,0 +1,2 @@
+command: python $program/score.py --dataset_dir=$hidden --prediction_dir=$input/res --score_dir=$output
+description: Compute scores for the competition
