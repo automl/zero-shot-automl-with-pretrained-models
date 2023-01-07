@@ -4,6 +4,7 @@ import argparse
 import os
 import sys
 sys.path.append(os.getcwd())
+sys.path.append("../")
 import warnings
 import logging
 import pickle

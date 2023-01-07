@@ -2,7 +2,7 @@ import os
 from time import time
 from random import shuffle
 
-solutions = ['Random-selection-I', 'Random-selection-II', 'Random-selection-III', "Single-best", "Oracle",
+solutions = ['Random-selection', "Single-best", "Oracle",
              'DeepWisdom', 'DeepBlueAI', 'PASA_NJU', 'ZAP-AS', 'ZAP-HPO', 
              "ZAP-HPO-D25", "ZAP-HPO-D50", "ZAP-HPO-D75"]
 

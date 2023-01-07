@@ -1,6 +1,7 @@
 import os
 import sys
 sys.path.append(os.getcwd())
+sys.path.append("../")
 import random
 import traceback
 from pathlib import Path
@@ -9,7 +10,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import yaml
-from src.available_datasets import all_datasets
+from available_datasets import all_datasets
 from src.competition.ingestion_program.dataset import AutoDLDataset
 from src.utils import dump_meta_features_df_and_csv
 

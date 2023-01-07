@@ -2,11 +2,12 @@ import itertools as it
 import os
 import sys
 sys.path.append(os.getcwd())
+sys.path.append("../")
 from pathlib import Path
 from random import shuffle
 
 import yaml
-from src.available_datasets import all_datasets
+from available_datasets import all_datasets
 
 def construct_command(config, dataset, base_datasets_dir, repeat, configs_path):
     dataset_dir = Path(base_datasets_dir, dataset)

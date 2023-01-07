@@ -28,7 +28,7 @@ class LogicModel(Model):
         print(test_dataset_name)
 
         
-        p = Path(__file__).parents[5] / "data/models/AutoFolio_models/ZAP" / test_dataset_name
+        p = Path(__file__).parents[5] / "data/models/AutoFolio_models" / test_dataset_name
         model_fn = str(p)
         print(model_fn)
 

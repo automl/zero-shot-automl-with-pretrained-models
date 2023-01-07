@@ -1,4 +1,6 @@
 import os
+import sys
+sys.path.append(os.getcwd())
 import json
 import itertools
 
@@ -10,25 +12,24 @@ import matplotlib as mpl
 import seaborn as sns
 sns.set()
 
-#font = {'weight': 'bold', 'size': 24}
+# For ICML submission purposes #
+#font = {'weight': 'bold', 'size': 24} 
 #mpl.rc('font', **font)
 
 def list_strip(list_str):
     list_str = list_str[1:-1]
     return [float(elem.strip()) for elem in list_str.split(',')]
 
-def parse_n_collect_results(savepath = "./benchmark_results/results.json"):
+def parse_n_collect_results(savepath = "./data/benchmark_results/results.json"):
 
-    with open(savepath, "r") as f:
-        soln_score_dict = json.load(f)
+    try:
+        with open(savepath, "r") as f:
+            soln_score_dict = json.load(f)
+    except:
+        soln_score_dict = dict()
     
-    #soln_score_dict = dict()
-
     for soln_id, soln_path in zip(SOLUTIONS, SOLUTION_PATHS):
         print(f"Solution: {soln_id}")
-
-        if soln_id not in ['ekrem_generalist_old']:
-            continue
 
         data_score_dict = dict()
         for d_id in ALL_DATASET_IDS:
@@ -83,7 +84,7 @@ def get_incumbent(_list):
         incumbent_list.append(current_incumbent)
     return incumbent_list
 
-def load_n_report_results(loadpath = "./benchmark_results/results.json", reportpath = "./benchmark_results/results_summary.txt"):
+def load_n_report_results(loadpath = "./data/benchmark_results/results.json", reportpath = "./data/benchmark_results/results_summary.txt"):
     with open(loadpath, "r") as f:
         soln_score_dict = json.load(f)
 
@@ -167,7 +168,7 @@ def load_n_report_results(loadpath = "./benchmark_results/results.json", reportp
 
     return soln_scores, soln_naucs, soln_accs, soln_scores_per_dataset, soln_std_per_dataset, soln_nauc_per_dataset, soln_acc_per_dataset, unfolded_scores, unfolded_naucs, soln_evolutions
 
-def benchmarking_boxplot(soln_scores, solutions, solution_labels, savepath = "./benchmark_results/benchmarking_boxplot.png", figsize = (6, 9), xlabel = "ALC score"):
+def benchmarking_boxplot(soln_scores, solutions, solution_labels, savepath = "./data/benchmark_results/benchmarking_boxplot.png", figsize = (6, 9), xlabel = "ALC score"):
 
     ordered_soln_scores = []
     for solution in solutions:
@@ -182,7 +183,7 @@ def benchmarking_boxplot(soln_scores, solutions, solution_labels, savepath = "./
     plt.tight_layout()
     plt.savefig(savepath)
 
-def benchmarking_violinplot(soln_scores, solutions, solution_labels, savepath = "./benchmark_results/benchmarking_violinplot.png", figsize = (6, 9)):
+def benchmarking_violinplot(soln_scores, solutions, solution_labels, savepath = "./data/benchmark_results/benchmarking_violinplot.png", figsize = (6, 9)):
 
     ordered_soln_scores = []
     for solution in solutions:
@@ -201,7 +202,7 @@ def benchmarking_violinplot(soln_scores, solutions, solution_labels, savepath = 
     plt.tight_layout()
     plt.savefig(savepath)
 
-def datasetwise_comparison_scatterplot(soln_scores_per_dataset, soln_std_per_dataset, savepath = "./benchmark_results/comparison_scatterplots", bar_width = 0.7):
+def datasetwise_comparison_scatterplot(soln_scores_per_dataset, soln_std_per_dataset, savepath = "./data/benchmark_results/comparison_scatterplots", bar_width = 0.7):
 
     solutions = COMPETITIVE_SOLUTIONS+STRONG_BASELINES+WINNER_BASELINES
     labels = COMPETITIVE_LABELS+STRONG_LABELS +WINNER_LABELS
@@ -476,7 +477,6 @@ def evolution_plot(soln_evolutions, solutions, solution_labels, savepath = "resu
         evolution_error = soln_evolutions[solution].std(0)[:60]
         plt.step(np.arange(60), evolution_vector, label = solution)
         plt.fill_between(np.arange(60), evolution_vector-evolution_error, evolution_vector+evolution_error, step='pre', alpha = 0.2)
-        #plt.errorbar(np.arange(60), evolution_vector, yerr = evolution_error, label = solution)
     plt.xlabel("Time (seconds)", size=24)
     plt.ylabel("ALC score", size = 24)
     plt.xticks(size=24)
@@ -488,25 +488,23 @@ def evolution_plot(soln_evolutions, solutions, solution_labels, savepath = "resu
 
 if __name__ == '__main__':
 
-    RUN_RESULTS_DIR = "../benchmark_run_results/"
-    RESULTS_DIR = "./benchmark_results"
+    RUN_RESULTS_DIR = "./data/benchmark_final_results/"
+    RESULTS_DIR = "./data/benchmark_results"
 
     # Solution folder names
     COMPETITIVE_SOLUTIONS = ['ZAP-AS', 'ZAP-HPO'] 
-    RANDOM_BASELINES = ['Random-selection-I', 'Random-selection-II', 'Random-selection-III']
-    WINNER_BASELINES = ['DeepWisdom', 'DeepBlueAI', 'PASA_NJU']
-    STRONG_BASELINES = ['Single-best', 'Oracle']
+    WINNER_BASELINES = ['DeepWisdom', 'DeepBlueAI', 'PASA_NJU'] # Please pull these solutions from their repositories
+    CONVENTIONAL_BASELINES = ['Random-selection', 'Single-best', 'Oracle']
     SPARSE_ABLATION_SOLUTIONS = ['ZAP-HPO-D25', 'ZAP-HPO-D50', 'ZAP-HPO-D75']
     
     # Labels for plots
     COMPETITIVE_LABELS = ['ZAP-AS','ZAP-HPO']
-    RANDOM_LABELS = ['Random I', 'Random II', 'Random III'] 
     WINNER_LABELS = ['DeepWisdom', 'DeepBlueAI', 'PASA-NJU']
-    STRONG_LABELS = ['Single-best', 'Oracle']
+    CONVENTIONAL_LABELS = ['Random-selection', 'Single-best', 'Oracle']
     SPARSE_ABLATION_LABELS = ['ZAP-HPO (75%)', 'ZAP-HPO (50%)', 'ZAP-HPO (25%)']
 
-    SOLUTIONS = COMPETITIVE_SOLUTIONS+WINNER_BASELINES+SPARSE_ABLATION_SOLUTIONS+RANDOM_BASELINES+STRONG_BASELINES
-    LABELS = COMPETITIVE_LABELS+WINNER_LABELS+SPARSE_ABLATION_LABELS+RANDOM_LABELS+STRONG_LABELS
+    SOLUTIONS = COMPETITIVE_SOLUTIONS+WINNER_BASELINES+SPARSE_ABLATION_SOLUTIONS+CONVENTIONAL_BASELINES
+    LABELS = COMPETITIVE_LABELS+WINNER_LABELS+SPARSE_ABLATION_LABELS+CONVENTIONAL_LABELS
 
     ALL_DATASETS = ['cifar100', 'cycle_gan_vangogh2photo', 'uc_merced', 'cifar10', 'cmaterdb_devanagari', 
                     'cmaterdb_bangla', 'mnist', 'horses_or_humans', 'kmnist', 'cycle_gan_horse2zebra', 'cycle_gan_facades', 
@@ -531,8 +529,8 @@ if __name__ == '__main__':
     evolution_plot(soln_evolutions, solutions, solution_labels)
 
     
-    solutions = RANDOM_BASELINES+WINNER_BASELINES+[STRONG_BASELINES[0]]+COMPETITIVE_SOLUTIONS+SPARSE_ABLATION_SOLUTIONS+[STRONG_BASELINES[1]]
-    solution_labels = RANDOM_LABELS+WINNER_LABELS+[STRONG_LABELS[0]]+COMPETITIVE_LABELS+SPARSE_ABLATION_LABELS+[STRONG_LABELS[1]]
+    solutions = CONVENTIONAL_BASELINES+WINNER_BASELINES+COMPETITIVE_SOLUTIONS+SPARSE_ABLATION_SOLUTIONS
+    solution_labels = CONVENTIONAL_LABELS+WINNER_LABELS+COMPETITIVE_LABELS+SPARSE_ABLATION_LABELS
     benchmarking_boxplot(soln_scores, solutions, solution_labels, f"{RESULTS_DIR}/benchmarking_boxplot/all.png", (9, 18))
     benchmarking_boxplot(soln_naucs, solutions, solution_labels, f"{RESULTS_DIR}/benchmarking_boxplot/all_nauc.png", (9, 18), 'NAUC Score')
     benchmarking_boxplot(soln_accs, solutions, solution_labels, f"{RESULTS_DIR}/benchmarking_boxplot/all_acc.png", (9, 18), 'Multi-classification Accuracy')
@@ -543,8 +541,8 @@ if __name__ == '__main__':
     benchmarking_boxplot(soln_scores, solutions, solution_labels, f"{RESULTS_DIR}/benchmarking_boxplot/main.png", (9, 4))
     benchmarking_violinplot(soln_scores_per_dataset, solutions, solution_labels, f"{RESULTS_DIR}/benchmarking_violinplot/main.png")
 
-    solutions = WINNER_BASELINES+RANDOM_BASELINES+STRONG_BASELINES
-    solution_labels = WINNER_LABELS+RANDOM_LABELS+STRONG_LABELS
+    solutions = CONVENTIONAL_BASELINES+WINNER_BASELINES
+    solution_labels = CONVENTIONAL_LABELS+WINNER_LABELS
     benchmarking_boxplot(soln_scores, solutions, solution_labels, f"{RESULTS_DIR}/benchmarking_boxplot/only_baselines.png", (9, 12))
     benchmarking_violinplot(soln_scores_per_dataset, solutions, solution_labels, f"{RESULTS_DIR}/benchmarking_violinplot/only_baselines.png")
 
@@ -564,4 +562,4 @@ if __name__ == '__main__':
 
     ranking(unfolded_scores, unfolded_naucs, SPARSE_ABLATION_SOLUTIONS, SPARSE_ABLATION_LABELS, f"{RESULTS_DIR}/ranking_summary_sparse.txt")
 
-    ranking(unfolded_scores, unfolded_naucs, STRONG_BASELINES, STRONG_LABELS, f"{RESULTS_DIR}/ranking_summary_strong.txt")
+    ranking(unfolded_scores, unfolded_naucs, CONVENTIONAL_BASELINES, CONVENTIONAL_LABELS, f"{RESULTS_DIR}/ranking_summary_zap_baselines.txt")

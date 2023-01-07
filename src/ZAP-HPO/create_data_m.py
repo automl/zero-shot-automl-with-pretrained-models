@@ -59,7 +59,7 @@ if __name__ == "__main__":
     meta_features.columns.values[0] = "dataset"
     top_config = os.path.join(args.metadata_path, 'configs/kakaobrain_optimized_per_icgen_augmentation')
     all_yaml_paths, incumbent_of, perf_matrix = get_config_response(config_dir=top_config,
-                                                                    response_dir=os.path.join(args.metadata_path,
+                                                                    response_file=os.path.join(args.metadata_path,
                                                                                               'perf_matrix.csv'))
     construct_csv(meta_features, perf_matrix, sorted(incumbent_of), os.path.join(args.save_path,args.save_file))
     end = time.time()

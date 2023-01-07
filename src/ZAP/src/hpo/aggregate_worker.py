@@ -1,6 +1,10 @@
 import random
 from pathlib import Path
 
+import os
+import sys
+sys.path.append("../")
+
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 import numpy as np
@@ -9,7 +13,7 @@ import tensorflow as tf
 import torch
 import yaml
 from hpbandster.core.worker import Worker
-from src.available_datasets import all_datasets
+from available_datasets import all_datasets
 from src.competition.run_local_test import run_baseline as evaluate_on_dataset
 from src.hpo.utils import construct_model_config
 
