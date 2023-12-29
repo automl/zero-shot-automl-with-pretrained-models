@@ -125,7 +125,22 @@ One can switch off `parse_and_collect_results()` method inside the script above 
 For the cost matrix heat map and meta-feature scatter plot run
 
 ```
+
 python analysis/meta_dataset/meta_dataset_analysis.py
 ```
 
 This will provide these two plots under the `analysis/meta_dataset/`.
+
+
+# Cite
+If you make use our method, please cite us as follows:
+
+```
+@inproceedings{ferreira-icml22a,
+title = {Zero-shot AutoML with Pretrained Models},
+author = {Ekrem Öztürk* and Fabio Ferreira* and Hadi S. Jomaa* and Lars Schmidt-Thieme and Josif Grabocka and Frank Hutter},
+year = {2022},
+booktitle = {International Conference on Machine Learning (ICML)},
+keywords = {}
+}
+```
